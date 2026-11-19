@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>퀴즈 대시보드</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<style>
+/* 휴대폰: 탭으로 하나씩 · 교실 TV(넓은 화면): 네 칸을 한 번에 */
+main.dash { max-width: 560px; }
+.dhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dhead h1 { font-size: 30px; line-height: 1.1; }
+.dhead .sub { font-size: 13px; font-weight: 700; color: var(--sub); display: flex; align-items: center; gap: 6px; }
+.kpis.k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.kpis.k4 .v { font-size: 22px; }
+.panel { display: none; }
+.panel.on { display: flex; }
+.panel h2 { display: none; margin: 0; font-family: var(--round); font-weight: 400; font-size: 24px; }
+.panel .scroller { max-height: max(260px, calc(100svh - 470px)); }
+.cl-scroll { max-height: max(260px, calc(100svh - 470px)); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.qr-panel, .tv-only { display: none; }
+.back { text-align: center; }
+.me-empty { font-size: 15px; font-weight: 700; color: var(--sub); }
+
+@media (min-width: 1000px) {
+  main.dash { max-width: none; height: 100svh; min-height: 0; padding: 20px 28px 24px; gap: 14px; }
+  .dhead h1 { font-size: 44px; }
+  .dhead .sub { font-size: 16px; }
+  .me, .tabs, .back { display: none !important; }
+  .kpis.k4 { gap: 14px; }
+  .kpis.k4 .kpi { padding: 8px 18px; border-width: 3px; box-shadow: 4px 4px 0 var(--ink); }
+  .kpis.k4 .k { font-size: 15px; }
+  .kpis.k4 .v { font-size: 40px; }
+  .board { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.35fr 1.1fr 1.2fr 0.85fr; grid-template-rows: minmax(0, 1fr); gap: 16px; }
+  .ar.mine { position: static; }
+  .panel, .panel.on { display: flex; min-height: 0; overflow: hidden; }
+  .panel h2 { display: block; }
+  .panel .scroller, .cl-scroll { max-height: none; flex: 1; overflow: hidden; -webkit-mask-image: none; mask-image: none; }
+  .qr-panel { display: flex; }
+  .panel[data-panel="perfect"] { display: none !important; }
+  .tv-only { display: block; }
+  .ar { min-height: 46px; } .ar .who2 { font-size: 18px; } .ar .sc b { font-size: 22px; }
+  .rk { font-size: 17px; grid-template-columns: 30px 104px minmax(0, 1fr) 92px; }
+  .tt .tn { font-size: 20px; } .tt .who { font-size: 16px; }
+}
+.qr-box { background: #FFFFFF; border: 3px solid var(--ink); border-radius: 16px; padding: 12px; line-height: 0; align-self: center; }
+.qr-box svg { width: 100%; height: auto; max-width: 260px; display: block; margin: 0 auto; }
+.pf-mini { display: flex; flex-direction: column; gap: 4px; overflow: hidden; flex: 1; min-height: 0; }
+.pf-mini .pf { grid-template-columns: 28px minmax(0, 1fr) auto; font-size: 15px; }
+.pf-mini .pf .id { display: none; }
+.pf-mini .pf > span:nth-child(3) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<main class="dash" id="app">
+  <div class="dhead">
+    <div class="stack" style="gap:2px">
+      <span class="pill" id="school">퀴즈 대시보드</span>
+      <h1><span class="blue">AI·코딩</span> 퀴즈 챌린지</h1>
+    </div>
+    <div class="stack" style="gap:6px;align-items:flex-end">
+      <span class="sub"><span class="ldot"></span><span id="upd">연결하는 중…</span></span>
+    </div>
+  </div>
+  <div class="card me" id="dMe" hidden></div>
+  <div class="kpis k4" id="dKpi"></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="all" aria-selected="true">전체 순위</button>
+    <button role="tab" data-tab="class" aria-selected="false">반별 순위</button>
+    <button role="tab" data-tab="perfect" aria-selected="false" id="tabPerfect">만점자</button>
+    <button role="tab" data-tab="titles" aria-selected="false">칭호</button>
+  </div>
+  <div class="board">
+    <section class="card stack panel on" data-panel="all" style="gap:6px;padding:12px">
+      <h2>전체 순위</h2>
+      <div class="lhead"><span>점수 높은 순 → 같으면 빠른 순</span><button class="findme" id="findMe" hidden>내 위치로</button></div>
+      <div class="alist scroller" id="pAll"></div>
+    </section>
+    <section class="card stack panel" data-panel="class" style="gap:6px;padding:12px">
+      <h2>반별 총점 순위</h2>
+      <div class="cl-scroll" id="pClass"></div>
+      <p class="note">총점 = 반 학생 점수를 모두 더한 값 · 많이 참여할수록 올라가요</p>
+    </section>
+    <section class="card stack panel" data-panel="titles" style="gap:6px;padding:12px">
+      <h2>칭호 <small class="note">학교에서 단 한 명</small></h2>
+      <div class="tlist scroller" id="pTitles"></div>
+    </section>
+    <section class="card stack panel" data-panel="perfect" style="gap:6px;padding:12px">
+      <h2>만점자</h2>
+      <div class="pf note" style="min-height:0"><span>순위</span><span>학번</span><span>이름</span><span>걸린 시간</span></div>
+      <div class="plist scroller" id="pPerfect"></div>
+    </section>
+    <section class="card stack qr-panel" style="gap:10px;padding:14px;align-items:stretch">
+      <h2 style="display:block;margin:0;font-family:var(--round);font-weight:400;font-size:24px">QR로 참여!</h2>
+      <div class="qr-box" id="qr"></div>
+      <p style="margin:0;text-align:center;font-family:var(--round);font-size:20px;line-height:1.35">휴대폰 카메라로 찍으면<br>바로 시작해요</p>
+      <strong style="font-family:var(--round);font-weight:400;font-size:20px">만점자 <span id="pfCount"></span></strong>
+      <div class="pf-mini" id="pfMini"></div>
+    </section>
+  </div>
+  <p class="back"><a class="linkbtn" href="index.html">퀴즈 화면으로</a></p>
+</main>
+<div id="layer"></div>
+
+<script src="js/qrcode.js"></script>
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/mock.js"></script>
+<script>
+/* =====================================================================
+   대시보드 (이름은 가운데 글자가 가려져서 나와요)
+   - 휴대폰: 탭 · 내 순위 · 내 위치로
+   - TV(가로 1000px 이상): 네 칸 + 참여 QR
+   - 바뀐 게 있을 때만 다시 받아요 (TV 5초 · 휴대폰 10초마다 확인)
+   ===================================================================== */
+const sess = store.get('quiz_session');
+const token = sess && sess.token;
+const wide = () => matchMedia('(min-width: 1000px)').matches;
+const mover = makeMover();
+let ver = null, B = null, first = true, tab = 'all', holders = {}, lastTier, kpiOld = [];
+
+if (DEMO) window.MockDB.simulate = true;   // 체험 모드: 새 참가자가 들어오는 것처럼
+
+async function refresh() {
+  try {
+    const s = await rpc('quiz_stats', { p_token: token || null, p_ver: ver });
+    document.getElementById('upd').textContent = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' 업데이트';
+    if (s.same) return;
+    ver = s.ver; B = buildBoard(s);
+    paint(!first); first = false;
+  } catch (e) { document.getElementById('upd').textContent = '연결이 잠깐 끊겼어요 · 다시 시도 중'; }
+}
+
+function paint(animate) {
+  const st = B.settings;
+  document.getElementById('school').textContent = st.school + ' · 실시간 대시보드';
+  // 내 카드 (이 휴대폰으로 푼 학생만)
+  const $me = document.getElementById('dMe');
+  if (B.me) {
+    const me = B.me, t = TIERS[me.tier], mv = mover('me', me.rank), tch = lastTier !== undefined && lastTier !== me.tier; lastTier = me.tier;
+    $me.hidden = false;
+    $me.innerHTML = `${emblem(me.tier, 68, me.flawless)}
+      <div class="stack" style="gap:2px;min-width:0;flex:1">
+        <span class="big${mv ? ' bump' : ''}">전체 ${me.rank}등 <small>/ ${B.n}명</small>${mv}</span>
+        <span class="meline">${me.score}점 · <span class="${tch ? 'bump' : ''}" style="color:${t.c2}">${t.name}</span>${me.flawless ? ' <span class="flawmini">무결점</span>' : ''}</span>
+        <span class="note">${fmtTime(me.time)} · 우리 반(${me.grade}-${me.cls}) ${B.myClass.rank}위</span>
+      </div>`;
+    document.getElementById('findMe').hidden = false;
+  } else if (token) { $me.hidden = false; $me.innerHTML = '<span class="me-empty">퀴즈를 끝내면 여기에 내 순위가 나와요.</span>'; }
+  // 숫자 칸
+  const kp = [['참가자', `${B.n}명`, ''], ['전체 평균', `${B.avg}점`, ''], ['만점자', `${B.perfect.length}명`, 'color:var(--coral)'], ['지금 푸는 중', `${B.playing}명`, 'color:var(--ai)']];
+  document.getElementById('dKpi').innerHTML = kp.map(([k, v, s], i) => `<div class="kpi"><div class="k">${k}</div><div class="v${animate && kpiOld[i] !== v ? ' bump' : ''}" style="${s}">${v}</div></div>`).join('');
+  kpiOld = kp.map(x => x[1]);
+  document.getElementById('tabPerfect').textContent = `만점자 ${B.perfect.length}`;
+  document.getElementById('pfCount').textContent = `${B.perfect.length}명`;
+
+  // 전체 순위
+  const tv = wide();
+  const allRows = (tv ? B.rows.slice(0, 40) : B.rows).map(p => {
+    const k = p.mine ? 'me' : p.sid;
+    return `<div class="ar${p.rank <= 3 ? ' r' + p.rank : ''}${p.mine ? ' mine' : ''}" data-key="a${k}"><span class="no">${p.rank}</span>${mini(p.tier, p.flawless)}<span class="who2"><span class="id">${p.sid}</span> ${esc(p.mine && B.me.fullName ? B.me.fullName : p.name)}${p.mine ? `<span class="chip mechip">나</span>${mover('ame', p.rank)}` : ''}</span><span class="sc"><b>${p.score}</b><small>${fmtTime(p.time)}</small></span></div>`;
+  }).join('') || '<p class="note">아직 참가자가 없어요. 첫 도전자가 되어 보세요!</p>';
+  flip(document.getElementById('pAll'), allRows, animate);
+  // 반별
+  const max = B.classes.length ? B.classes[0].total : 1;
+  flip(document.getElementById('pClass'), B.classes.map(c => `<div class="rk${c.rank === 1 ? ' top1' : ''}${c.mine ? ' mine' : ''}" data-key="c${c.key}"><span class="no">${c.rank}</span><span class="lb">${c.grade}학년 ${c.cls}반${mover('c' + c.key, c.rank)}</span><div class="track"><span style="width:${c.total / max * 100}%"></span></div><span class="val"><b>${c.total.toLocaleString()}점</b><small>평균 ${c.avg} · ${c.n}명</small></span></div>`).join('') || '<p class="note">아직 기록이 없어요.</p>', animate);
+  // 만점자
+  const pf = B.perfect.map((p, i) => { const k = p.mine ? 'me' : p.sid; return `<div class="pf${i === 0 ? ' top1' : ''}${p.mine ? ' mine' : ''}" data-key="p${k}"><span class="no">${i + 1}</span><span class="id">${p.sid}</span><span>${esc(p.name)}${p.mine ? ' <span class="chip mechip">나</span>' : ''}${p.flawless ? ' <span class="flawmini">무결점</span>' : ''}${mover('p' + k, i + 1)}</span><span class="tm">${fmtTime(p.time)}</span></div>`; });
+  flip(document.getElementById('pPerfect'), pf.join('') || '<p class="note">아직 만점자가 없어요.</p>', animate);
+  flip(document.getElementById('pfMini'), pf.slice(0, 12).join('') || '<p class="note">첫 만점자를 기다려요!</p>', animate);
+  // 칭호
+  flip(document.getElementById('pTitles'), B.titles.map(x => {
+    const h = x.holder, hk = h ? h.sid : '';
+    const changed = animate && holders[x.id] !== undefined && holders[x.id] !== hk; holders[x.id] = hk;
+    const who = h ? `<span class="id">${h.sid}</span> ${esc(h.mine && B.me.fullName ? B.me.fullName : h.name)}${h.mine ? ' <span class="chip mechip">나</span>' : ''}` : '<span class="note">아직 없음</span>';
+    return `<div class="tt${h && h.mine ? ' mine' : ''}" data-key="t${x.id}">${titleIcon(x.id)}<div style="min-width:0"><div class="tn">${x.name}${changed ? ' <span class="mv up">NEW</span>' : ''}</div><div class="td">${x.text || '첫 주인공을 기다려요'}</div></div><div class="who${changed ? ' bump' : ''}">${who}</div></div>`;
+  }).join(''), animate);
+  if (!animate && B.me && tab === 'all') setTimeout(findMe, 80);
+}
+function findMe() {
+  const box = document.getElementById('pAll'), el = box.querySelector('[data-key="ame"]');
+  if (el) box.scrollTo({ top: Math.max(0, el.offsetTop - box.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2), behavior: REDUCED ? 'auto' : 'smooth' });
+}
+document.querySelector('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  tab = b.dataset.tab;
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', String(x === b)));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.dataset.panel === tab));
+  const on = document.querySelector('.panel.on'); if (on && on.animate && !REDUCED) on.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 220 });
+  if (tab === 'all') setTimeout(findMe, 60);
+});
+document.getElementById('findMe').addEventListener('click', findMe);
+
+// 참여 QR (TV용) : 이 대시보드와 같은 폴더의 퀴즈 주소
+document.getElementById('qr').innerHTML = qrSvg(new URL('./', location.href).href);
+
+// 주기적으로 확인 (화면이 보일 때만)
+let timer = null;
+function schedule() { clearTimeout(timer); timer = setTimeout(async () => { if (document.visibilityState === 'visible') await refresh(); schedule(); }, wide() ? 5000 : 10000); }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
+demoRibbon();
+refresh().then(schedule);
+
+/* 숨은 관리자 입구: 위쪽 학교 이름 배지를 2초 안에 5번 누르면 관리자 페이지로 가요. */
+(() => { let taps = []; const el = document.getElementById('school'); if (!el) return;
+  el.addEventListener('click', () => { const now = Date.now(); taps = taps.filter(t => now - t < 2000).concat(now); if (taps.length >= 5) { taps = []; location.href = 'admin.html'; } }); })();
+</script>
+</body>
+</html>

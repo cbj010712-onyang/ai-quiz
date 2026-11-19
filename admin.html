@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>퀴즈 관리자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+<style>
+main.adm { max-width: 1120px; gap: 14px; }
+.ahead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.ahead h1 { font-size: 34px; }
+.ahead .acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.mini-btn { min-height: 40px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); font-weight: 900; font-size: 15px; }
+.mini-btn.yellow { background: var(--sun); } .mini-btn.red { background: var(--bad-bg); color: var(--bad); } .mini-btn.green { background: var(--ok-bg); color: var(--ok); }
+.mini-btn:disabled { opacity: .5; }
+.rs-scope { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.rs-pick { display: flex; gap: 8px; } .rs-pick .sel { flex: 1; min-width: 0; }
+.rs-count { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; background: var(--bad-bg); border: 2px solid var(--bad); border-radius: 14px; padding: 10px 14px; font-size: 17px; }
+.rs-count .big { font-family: var(--display); font-weight: 400; font-size: 28px; color: var(--bad); }
+.rs-count .note { flex-basis: 100%; }
+.btn:disabled { opacity: .45; box-shadow: none; }
+.atabs { display: flex; gap: 0; border: 3px solid var(--ink); border-radius: 14px; overflow: hidden; align-self: flex-start; }
+.atabs button { min-height: 46px; padding: 0 20px; border: none; background: var(--paper); font-family: var(--round); font-size: 18px; }
+.atabs button + button { border-left: 3px solid var(--ink); }
+.atabs button[aria-selected="true"] { background: var(--sun); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.bar input, .bar select, .f input, .f select, .f textarea { min-height: 42px; border: 2px solid var(--ink); border-radius: 10px; background: var(--paper); color: var(--ink); font: 700 15px var(--body); padding: 0 10px; }
+.bar input[type="search"] { flex: 1; min-width: 160px; }
+.sum { display: flex; flex-wrap: wrap; gap: 8px; }
+.sum span { background: var(--paper); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 12px; font-weight: 700; font-size: 14px; }
+.tblwrap { overflow-x: auto; border: 3px solid var(--ink); border-radius: 16px; background: var(--paper); max-height: calc(100svh - 300px); overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid #EDE6C8; text-align: left; white-space: nowrap; }
+th { position: sticky; top: 0; background: var(--cream); font-size: 13px; z-index: 1; cursor: pointer; }
+td.num { font-variant-numeric: tabular-nums; text-align: right; }
+tr.playing td { color: var(--sub); }
+.tag2 { display: inline-block; font-size: 12px; font-weight: 900; border-radius: 999px; padding: 0 8px; border: 1.5px solid var(--ink); }
+.tag2.done { background: var(--ok-bg); } .tag2.play { background: var(--pick-bg); }
+.qrow { display: grid; grid-template-columns: 46px 88px 64px 92px minmax(0, 1fr) 110px 70px 70px; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid #EDE6C8; font-size: 15px; }
+.qrow.off { opacity: .5; }
+.qrow .qt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.qrow .stars { font-size: 14px; }
+.qhead { font-size: 13px; font-weight: 900; background: var(--cream); position: sticky; top: 0; z-index: 1; }
+.sw { position: relative; width: 52px; height: 30px; border-radius: 999px; border: 2px solid var(--ink); background: #E5E7EB; padding: 0; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper); border: 2px solid var(--ink); transition: left .15s; }
+.sw[aria-checked="true"] { background: #22C55E; } .sw[aria-checked="true"]::after { left: 25px; }
+.warn { background: var(--bad-bg); border: 2px solid var(--bad); color: var(--bad); border-radius: 12px; padding: 8px 12px; font-weight: 700; font-size: 14px; }
+.cover { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cover div { background: var(--paper); border: 2px solid var(--ink); border-radius: 12px; padding: 6px 10px; font-size: 13px; font-weight: 700; }
+.cover b { font-family: var(--round); font-weight: 400; font-size: 16px; }
+/* 문제 편집 */
+.modal .card.wide { max-width: 760px; }
+.f { display: grid; gap: 4px; }
+.f > span { font-size: 13px; font-weight: 900; color: var(--sub); }
+.f input, .f select, .f textarea { width: 100%; min-width: 0; }
+#sQr svg { width: 100%; height: auto; display: block; }
+.f textarea { min-height: 84px; padding: 8px 10px; font-family: var(--body); resize: vertical; line-height: 1.5; }
+.f textarea.mono, .f input.mono { font-family: var(--mono); font-weight: 500; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 640px) { .grid2, .grid4 { grid-template-columns: 1fr; } .qrow { grid-template-columns: 40px 70px minmax(0, 1fr) 60px; } .qrow .h-sm { display: none; } }
+.opt-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) 36px; gap: 6px; align-items: center; }
+.opt-row input[type="text"] { width: 100%; }
+.chk { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 15px; }
+.chk input { width: 20px; height: 20px; }
+.spotwrap { position: relative; display: inline-block; line-height: 0; border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; cursor: crosshair; max-width: 100%; touch-action: none; }
+.spotwrap img { max-width: 100%; max-height: 300px; user-select: none; }
+.spotwrap .spotbox { position: absolute; }
+.help2 { font-size: 13px; color: var(--sub); font-weight: 700; margin: 0; }
+.login { max-width: 420px; margin: auto; }
+</style>
+</head>
+<body>
+<main class="adm" id="app"><p class="loading">불러오는 중…</p></main>
+<div id="layer"></div>
+
+<script src="js/qrcode.js"></script>
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/mock.js"></script>
+<script>
+/* =====================================================================
+   관리자 페이지 (비밀번호가 있어야 열려요)
+   - 참가 기록: 실명 그대로 · 답 보기 · 기록 지우기(다시 도전 허용) · CSV
+   - 문제: 추가 · 수정 · 숨기기 · 삭제 (12가지 유형)
+   - 설정: 퀴즈 열기/닫기 · 등급 방식 · 제한 시간 · 비밀번호 · 전체 초기화
+   ===================================================================== */
+const $app = document.getElementById('app'), $layer = document.getElementById('layer');
+const ss = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }, del(k) { try { sessionStorage.removeItem(k); } catch (e) {} } };
+const ls = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
+const forgetPw = () => { ss.del('quiz_admin_pw'); ls.del('quiz_admin_pw'); PW = null; };
+let PW = ss.get('quiz_admin_pw') || ls.get('quiz_admin_pw'), D = null, tab = 'people', sortKey = 'rank', sortDir = 1;
+const F = { q: '', grade: '', cls: '', status: '', area: '', type: '', qs: '' };
+const TYPES = ['ox', 'mc', 'multi', 'input', 'fill', 'order', 'match', 'bug', 'sort', 'imgox', 'imgspot', 'imgpick'];
+const TYPE_HELP = {
+  ox: 'O/X 하나 고르기', mc: '보기 중 하나 고르기', multi: '정답 보기 여러 개 고르기', input: '답을 직접 적기', fill: '코드·문장의 빈칸에 블록 넣기',
+  order: '블록을 순서대로 쌓기', match: '왼쪽·오른쪽 짝 맞추기', bug: '틀린(수상한) 줄 누르기', sort: '항목을 두 무리로 나누기',
+  imgox: '그림 보고 O/X', imgspot: '그림에서 수상한 곳 누르기', imgpick: '두 그림 중 고르기',
+};
+
+function modal(inner, wide) { $layer.innerHTML = `<div class="modal" data-act="close"><div class="card stack${wide ? ' wide' : ''}" style="gap:12px">${inner}</div></div>`; }
+const closeModal = () => { $layer.innerHTML = ''; };
+const fmtDT = s => { if (!s) return '-'; const d = new Date(s); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+/* ---------- 로그인 ---------- */
+function viewLogin(msg) {
+  $app.innerHTML = `<div class="card stack login">
+    <span class="pill">관리자 전용</span>
+    <strong class="ftitle">퀴즈 관리자 로그인</strong>
+    ${DEMO ? '<p class="note">체험 모드 비밀번호: <b>admin1234</b></p>' : ''}
+    <input class="sel" id="pw" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
+    <label class="chk"><input type="checkbox" id="keep"> 이 기기에서 로그인 유지 <span class="note">(선생님 개인 휴대폰·PC에서만)</span></label>
+    ${msg ? `<p class="err" role="alert">${esc(msg)}</p>` : ''}
+    <button class="btn wide" id="loginBtn">들어가기</button>
+    <p class="note">비밀번호는 Supabase SQL Editor 에서 <code>select quiz__set_password('...');</code> 로 정해요.</p>
+  </div>`;
+  const go = async () => {
+    const v = document.getElementById('pw').value; if (!v) return;
+    document.getElementById('loginBtn').classList.add('busy');
+    try { await rpc('admin_login', { p_pw: v }); PW = v; ss.set('quiz_admin_pw', v); if (document.getElementById('keep').checked) ls.set('quiz_admin_pw', v); await load(); }
+    catch (e) { viewLogin(e.message); }
+  };
+  document.getElementById('loginBtn').onclick = go;
+  document.getElementById('pw').onkeydown = e => { if (e.key === 'Enter') go(); };
+  document.getElementById('pw').focus();
+}
+async function load(keepTab) {
+  try { D = await rpc('admin_data', { p_pw: PW }); render(); }
+  catch (e) { if (e.user && /비밀번호/.test(e.message)) { forgetPw(); viewLogin(e.message); } else toast(e.message); }
+}
+
+/* ---------- 화면 ---------- */
+function render() {
+  const st = D.settings;
+  $app.innerHTML = `<div class="ahead">
+      <div class="stack" style="gap:2px"><span class="pill">${esc(st.school)} · 관리자</span><h1><span class="blue">AI·코딩</span> 퀴즈 관리</h1></div>
+      <div class="acts">
+        <button class="mini-btn ${st.isOpen ? 'green' : 'red'}" data-act="toggleOpen" title="눌러서 바꾸기">${st.isOpen ? '● 퀴즈 열림' : '● 퀴즈 닫힘'}</button>
+        <a class="mini-btn" style="display:inline-flex;align-items:center;text-decoration:none;color:inherit" href="dashboard.html" target="_blank" rel="noopener">대시보드</a>
+        <button class="mini-btn red" data-act="askReset">기록 초기화</button>
+        <button class="mini-btn" data-act="reload">새로고침</button>
+        <button class="mini-btn" data-act="logout">로그아웃</button>
+      </div>
+    </div>
+    <div class="atabs" role="tablist">
+      ${[['people', `참가 기록 ${D.attempts.length}`], ['questions', `문제 ${D.questions.length}`], ['settings', '설정']].map(([k, l]) => `<button role="tab" data-act="tab" data-v="${k}" aria-selected="${tab === k}">${l}</button>`).join('')}
+    </div>
+    <div id="body"></div>`;
+  ({ people: viewPeople, questions: viewQuestions, settings: viewSettings })[tab]();
+}
+
+/* ----- 참가 기록 ----- */
+function peopleRows(all) {
+  const q = F.q.trim();
+  let list = D.attempts.map((a, i) => ({ ...a, sid: sidOf(a.grade, a.cls, a.num), status: a.finished ? 'done' : 'play' }));
+  let r = 0; list.filter(a => a.finished).sort((x, y) => y.score - x.score || x.time - y.time || new Date(x.finished) - new Date(y.finished)).forEach(a => { a.rank = ++r; });
+  if (!all) list = list.filter(a => (!F.grade || a.grade == F.grade) && (!F.cls || a.cls == F.cls) && (!F.status || a.status === F.status) && (!q || a.name.includes(q) || a.sid.includes(q)));
+  const val = a => ({ rank: a.rank ?? 1e9, sid: a.sid, name: a.name, score: a.score ?? -1, time: a.time ?? 1e9, hints: a.hints ?? 99, started: a.started })[sortKey];
+  return list.sort((x, y) => (val(x) > val(y) ? 1 : val(x) < val(y) ? -1 : 0) * sortDir);
+}
+function viewPeople() {
+  const all = D.attempts, done = all.filter(a => a.finished), avg = done.length ? Math.round(done.reduce((s, a) => s + a.score, 0) / done.length * 10) / 10 : 0;
+  const rows = peopleRows();
+  const th = (k, l) => `<th data-act="sort" data-v="${k}">${l}${sortKey === k ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  document.getElementById('body').innerHTML = `
+    <div class="sum"><span>완료 ${done.length}명</span><span>푸는 중 ${all.length - done.length}명</span><span>평균 ${avg}점</span><span>만점 ${done.filter(a => a.score === 100).length}명</span><span>무결점 ${done.filter(a => a.flawless).length}명</span></div>
+    <div class="bar">
+      <input type="search" id="fq" placeholder="이름 또는 학번 찾기" value="${esc(F.q)}">
+      <select id="fgrade"><option value="">전체 학년</option>${[1, 2, 3].map(g => `<option value="${g}"${F.grade == g ? ' selected' : ''}>${g}학년</option>`).join('')}</select>
+      <select id="fcls"><option value="">전체 반</option>${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}"${F.cls == i + 1 ? ' selected' : ''}>${i + 1}반</option>`).join('')}</select>
+      <select id="fstatus"><option value="">전체 상태</option><option value="done"${F.status === 'done' ? ' selected' : ''}>완료</option><option value="play"${F.status === 'play' ? ' selected' : ''}>푸는 중</option></select>
+      <button class="mini-btn yellow" data-act="csv">CSV 내려받기</button>
+    </div>
+    <div class="tblwrap"><table>
+      <thead><tr>${th('rank', '순위')}${th('sid', '학번')}${th('name', '이름')}${th('score', '점수')}<th>맞힘</th>${th('time', '시간')}${th('hints', '힌트')}<th>콤보</th><th>무결점</th><th>상태</th>${th('started', '시작')}<th></th></tr></thead>
+      <tbody>${rows.map(a => `<tr class="${a.finished ? '' : 'playing'}">
+        <td class="num">${a.rank ?? '-'}</td><td>${a.sid}</td><td><b>${esc(a.name)}</b></td>
+        <td class="num">${a.score ?? '-'}</td><td class="num">${a.finished ? `${a.right}/${a.total}` : `${a.answered}/${a.items}`}</td>
+        <td class="num">${a.time != null ? fmtTime(a.time) : '-'}</td><td class="num">${a.hints ?? '-'}</td><td class="num">${a.combo ?? '-'}</td>
+        <td>${a.flawless ? '<span class="flawmini">무결점</span>' : ''}</td>
+        <td><span class="tag2 ${a.status}">${a.finished ? '완료' : '푸는 중'}</span></td><td>${fmtDT(a.started)}</td>
+        <td><button class="mini-btn" data-act="detail" data-id="${a.id}">답 보기</button> <button class="mini-btn red" data-act="delAttempt" data-id="${a.id}">지우기</button></td>
+      </tr>`).join('') || '<tr><td colspan="12" class="note">아직 기록이 없어요.</td></tr>'}</tbody>
+    </table></div>
+    <p class="help2">'지우기'를 하면 그 학생이 처음부터 다시 도전할 수 있어요. 대시보드에는 이름 가운데가 가려져서 나와요.</p>`;
+  const rerender = () => { const y = scrollY; viewPeople(); scrollTo(0, y); };
+  document.getElementById('fq').oninput = e => { F.q = e.target.value; clearTimeout(window._ft); window._ft = setTimeout(() => { rerender(); const el = document.getElementById('fq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
+  ['grade', 'cls', 'status'].forEach(k => { document.getElementById('f' + k).onchange = e => { F[k] = e.target.value; rerender(); }; });
+}
+function csv(all) {
+  const head = ['순위', '학번', '학년', '반', '번호', '이름', '점수', '맞힌수', '문제수', '걸린시간(초)', '힌트', '최고콤보', '무결점', '상태', '시작', '완료'];
+  const lines = peopleRows(all).map(a => [a.rank ?? '', a.sid, a.grade, a.cls, a.num, a.name, a.score ?? '', a.right ?? '', a.total ?? '', a.time ?? '', a.hints ?? '', a.combo ?? '', a.flawless ? 'O' : '', a.finished ? '완료' : '푸는 중', a.started || '', a.finished || '']);
+  const text = '﻿' + [head, ...lines].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' }), name = `퀴즈기록_${new Date().toISOString().slice(0, 10)}.csv`;
+  const save = async () => {
+    const dl = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('downloads').catch(() => null) : undefined;
+    if (dl) { try { await dl.save({ filename: name, data: blob }); } catch (e) {} return; }
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  };
+  save();
+}
+async function showDetail(id) {
+  const a = D.attempts.find(x => x.id === id);
+  modal(`<strong class="ftitle">${sidOf(a.grade, a.cls, a.num)} ${esc(a.name)}</strong><p class="loading" style="font-size:16px">불러오는 중…</p>`, true);
+  try {
+    const items = await rpc('admin_attempt', { p_pw: PW, p_id: id }) || [];
+    const show = x => (x === null || x === undefined ? '<span class="note">-</span>' : esc(typeof x === 'string' ? x : JSON.stringify(x)));
+    modal(`<strong class="ftitle">${sidOf(a.grade, a.cls, a.num)} ${esc(a.name)} · ${a.score ?? '-'}점</strong>
+      <div class="stack" style="gap:6px;max-height:64svh;overflow-y:auto">${items.map(i => `<div class="rv"><span class="mk ${i.correct ? 'o' : 'x'}">${i.correct ? 'O' : i.correct === false ? 'X' : '·'}</span><div>
+        <div class="t">${i.pos + 1}. ${esc(i.q)}</div>
+        <div class="s">${i.area} · ${KIND[i.type]} · ${i.timeout ? '시간 초과' : i.time != null ? fmtTime(i.time) : '아직'}${i.hint ? ' · 힌트' : ''}</div>
+        <div class="s">학생 답: ${show(i.answer)}</div><div class="s" style="color:var(--ok);font-weight:700;white-space:pre-line">정답: ${esc(i.answerText)}</div></div></div>`).join('') || '<p class="note">문제 기록이 없어요 (예시 학생).</p>'}</div>
+      <button class="btn wide" data-act="close">닫기</button>`, true);
+  } catch (e) { closeModal(); toast(e.message); }
+}
+function askDelAttempt(id) {
+  const a = D.attempts.find(x => x.id === id);
+  modal(`<strong class="ftitle">기록을 지울까요?</strong><p><b>${sidOf(a.grade, a.cls, a.num)} ${esc(a.name)}</b> 학생의 기록이 사라지고, 처음부터 다시 도전할 수 있어요. 되돌릴 수 없어요.</p>
+    <div class="btn-row"><button class="btn ghost" data-act="close">그만두기</button><button class="btn" style="background:var(--coral);color:#fff" data-act="doDelAttempt" data-id="${id}">지우기</button></div>`);
+}
+
+/* ----- 문제 ----- */
+function viewQuestions() {
+  const qs = D.questions.filter(q => (!F.area || q.area === F.area) && (!F.type || q.type === F.type) && (!F.qs || (q.body.q || '').includes(F.qs) || q.topic.includes(F.qs)));
+  const act = D.questions.filter(q => q.active);
+  const cnt = (a, l) => act.filter(q => q.area === a && q.level === l).length;
+  const short = AREAS.filter(a => cnt(a, 1) < 3 || cnt(a, 2) < 1 || cnt(a, 3) < 1 || act.filter(q => q.area === a).length < 5);
+  document.getElementById('body').innerHTML = `
+    <div class="cover">${AREAS.map(a => `<div><b>${a}</b> · 켜진 문제 ${act.filter(q => q.area === a).length}개<br>★ ${cnt(a, 1)} · ★★ ${cnt(a, 2)} · ★★★ ${cnt(a, 3)}</div>`).join('')}</div>
+    ${short.length ? `<div class="warn">${short.join(', ')} 문제가 부족해요. 한 판에 스테이지마다 ★3 · ★★1 · ★★★1개를 뽑아요. 모자라면 다른 난이도로 채워요.</div>` : ''}
+    <div class="bar">
+      <input type="search" id="fqs" placeholder="문제 글·주제 찾기" value="${esc(F.qs)}">
+      <select id="farea"><option value="">전체 영역</option>${AREAS.map(a => `<option${F.area === a ? ' selected' : ''}>${a}</option>`).join('')}</select>
+      <select id="ftype"><option value="">전체 유형</option>${TYPES.map(t => `<option value="${t}"${F.type === t ? ' selected' : ''}>${KIND[t]}</option>`).join('')}</select>
+      <button class="mini-btn yellow" data-act="newQ">+ 새 문제</button>
+    </div>
+    <div class="tblwrap">
+      <div class="qrow qhead"><span>번호</span><span>영역</span><span class="h-sm">난이도</span><span class="h-sm">유형</span><span>문제</span><span class="h-sm">출제 · 정답률</span><span>출제</span><span></span></div>
+      ${qs.map(q => `<div class="qrow${q.active ? '' : ' off'}">
+        <span class="note">#${q.id}</span><span class="chip a-${q.area}" style="justify-self:start">${q.area}</span>
+        <span class="stars h-sm">${stars(q.level)}</span><span class="note h-sm">${KIND[q.type]}</span>
+        <span class="qt" title="${esc(q.body.q)}">${esc(q.body.q)}</span>
+        <span class="note h-sm">${q.used}번 · ${q.rate == null ? '-' : q.rate + '%'}</span>
+        <button class="sw" role="switch" aria-checked="${q.active}" aria-label="출제 켜기/끄기" data-act="toggleQ" data-id="${q.id}"></button>
+        <button class="mini-btn" data-act="editQ" data-id="${q.id}">수정</button>
+      </div>`).join('') || '<p class="note" style="padding:10px">해당하는 문제가 없어요.</p>'}
+    </div>
+    <p class="help2">출제를 끄면 새로 시작하는 학생에게 나오지 않아요. 이미 풀고 있는 학생은 시작할 때의 문제 그대로 채점돼요.</p>`;
+  const rerender = () => { const y = scrollY; viewQuestions(); scrollTo(0, y); };
+  document.getElementById('fqs').oninput = e => { F.qs = e.target.value; clearTimeout(window._ft); window._ft = setTimeout(() => { rerender(); const el = document.getElementById('fqs'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
+  document.getElementById('farea').onchange = e => { F.area = e.target.value; rerender(); };
+  document.getElementById('ftype').onchange = e => { F.type = e.target.value; rerender(); };
+}
+
+/* 문제 편집기 */
+let ED = null;   // 편집 중인 문제
+const lines = s => String(s || '').split('\n').map(x => x.replace(/\s+$/, '')).filter(x => x.trim() !== '');
+const val = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+const chk = id => { const el = document.getElementById(id); return !!(el && el.checked); };
+function openEditor(q) {
+  ED = q ? JSON.parse(JSON.stringify(q)) : { id: null, area: '파이썬', topic: '', level: 1, type: 'mc', active: true, body: { q: '', options: ['', '', '', ''], answer: 0, hint: '', why: '' } };
+  drawEditor();
+}
+function drawEditor() {
+  const q = ED, b = q.body;
+  modal(`<div class="ahead"><strong class="ftitle">${q.id ? `문제 #${q.id} 고치기` : '새 문제'}</strong>${q.id ? '<button class="mini-btn red" data-act="askDelQ">문제 삭제</button>' : ''}</div>
+    <div class="grid4">
+      <label class="f"><span>영역</span><select id="eArea">${AREAS.map(a => `<option${q.area === a ? ' selected' : ''}>${a}</option>`).join('')}</select></label>
+      <label class="f"><span>주제 (짧게)</span><input id="eTopic" value="${esc(q.topic)}" placeholder="예: 반복문"></label>
+      <label class="f"><span>난이도</span><select id="eLevel">${[1, 2, 3].map(l => `<option value="${l}"${q.level == l ? ' selected' : ''}>${'★'.repeat(l)}</option>`).join('')}</select></label>
+      <label class="f"><span>풀이 방식</span><select id="eType">${TYPES.map(t => `<option value="${t}"${q.type === t ? ' selected' : ''}>${KIND[t]}</option>`).join('')}</select></label>
+    </div>
+    <p class="help2">${TYPE_HELP[q.type]}</p>
+    <label class="f"><span>문제 글</span><textarea id="eQ" style="min-height:60px">${esc(b.q || '')}</textarea></label>
+    ${['fill'].includes(q.type) ? '' : `<label class="f"><span>코드 (없으면 비워 둬요)</span><textarea id="eCode" class="mono">${esc(b.code || '')}</textarea></label>`}
+    <div id="eType2">${typeFields(q.type, b)}</div>
+    <div class="grid2">
+      <label class="f"><span>힌트 (학생이 누르면 보여요)</span><textarea id="eHint" style="min-height:60px">${esc(b.hint || '')}</textarea></label>
+      <label class="f"><span>해설 (답한 뒤 보여요)</span><textarea id="eWhy" style="min-height:60px">${esc(b.why || '')}</textarea></label>
+    </div>
+    <label class="chk"><input type="checkbox" id="eActive"${q.active ? ' checked' : ''}> 출제하기</label>
+    <p class="err" id="eErr" role="alert"></p>
+    <div class="btn-row"><button class="btn ghost" data-act="close">닫기</button><button class="btn" data-act="saveQ">저장</button></div>`, true);
+  document.getElementById('eType').onchange = e => { const nt = e.target.value; ED = { ...collect(true, ED.type), type: nt }; ED.body = convertBody(ED.body, nt); drawEditor(); };
+  bindSpot();
+}
+/* 유형을 바꿔도 쓸 수 있는 건 옮겨 줘요 */
+function convertBody(b, t) {
+  const out = { q: b.q, code: b.code, hint: b.hint, why: b.why };
+  if (t === 'mc' || t === 'multi') { out.options = b.options || ['', '', '', '']; out.answer = 0; out.answers = [0]; }
+  if (t === 'ox' || t === 'imgox') out.answer = 'O';
+  if (t.startsWith('img')) { out.img = b.img || 'img/'; }
+  if (t === 'imgspot') out.spot = b.spot || [30, 30, 30, 30];
+  if (t === 'imgpick') { out.imgs = b.imgs || ['img/', 'img/']; out.answer = 0; }
+  if (t === 'sort') { out.buckets = b.buckets || ['', '']; out.items = b.items || []; }
+  if (t === 'fill') { out.code = b.code || ''; out.chips = b.chips || []; out.answer = []; }
+  if (t === 'input') out.answer = [];
+  if (t === 'bug') { out.lines = b.lines || []; out.answer = 0; }
+  if (t === 'order') out.blocks = b.blocks || [];
+  if (t === 'match') out.pairs = b.pairs || [];
+  return out;
+}
+function typeFields(t, b) {
+  switch (t) {
+    case 'ox': return `<div class="f"><span>정답</span><div class="bar">${['O', 'X'].map(k => `<label class="chk"><input type="radio" name="eOX" value="${k}"${b.answer === k ? ' checked' : ''}> ${k}</label>`).join('')}</div></div>`;
+    case 'imgox': return `${imgField('eImg', b.img)}<div class="f"><span>정답 (AI가 만든 그림이면 보통 O)</span><div class="bar">${['O', 'X'].map(k => `<label class="chk"><input type="radio" name="eOX" value="${k}"${b.answer === k ? ' checked' : ''}> ${k}</label>`).join('')}</div></div>`;
+    case 'mc': case 'multi': {
+      const opts = (b.options && b.options.length ? b.options : ['', '', '', '']);
+      const isOk = i => (t === 'mc' ? b.answer === i : (b.answers || []).includes(i));
+      return `<div class="f"><span>보기 (${t === 'mc' ? '정답 하나에 ●' : '정답 모두에 ✓'} · 학생에게는 섞여서 나와요)</span><div class="stack" style="gap:6px" id="eOpts">
+        ${opts.map((o, i) => `<div class="opt-row"><input type="${t === 'mc' ? 'radio' : 'checkbox'}" name="eAns" value="${i}"${isOk(i) ? ' checked' : ''} aria-label="정답"><input type="text" class="eOpt" value="${esc(o)}" placeholder="보기 ${i + 1}"><button class="mini-btn" data-act="delOpt" data-v="${i}" aria-label="보기 지우기">−</button></div>`).join('')}
+        </div><button class="mini-btn" data-act="addOpt" style="justify-self:start">+ 보기 추가</button></div>`;
+    }
+    case 'input': return `<div class="grid2"><label class="f"><span>인정할 정답 (한 줄에 하나 · 띄어쓰기·대소문자는 무시)</span><textarea id="eAnswers">${esc((b.answer || []).join('\n'))}</textarea></label><label class="f"><span>입력칸 안내 글</span><input id="ePh" value="${esc(b.placeholder || '')}" placeholder="예: 숫자"></label></div>`;
+    case 'fill': return `<label class="f"><span>코드·문장 (빈칸 자리에 {0}, {1} 처럼 적어요)</span><textarea id="eCode" class="mono">${esc(b.code || '')}</textarea></label>
+      <div class="grid2"><label class="f"><span>정답 (빈칸 순서대로 한 줄에 하나)</span><textarea id="eAnswers" class="mono">${esc((b.answer || []).join('\n'))}</textarea></label>
+      <label class="f"><span>블록 목록 (정답 + 헷갈리는 블록 · 한 줄에 하나)</span><textarea id="eChips" class="mono">${esc((b.chips || []).join('\n'))}</textarea></label></div>
+      <label class="chk"><input type="checkbox" id="ePlain"${b.plain ? ' checked' : ''}> 코드가 아니라 일반 문장이에요</label>`;
+    case 'order': return `<label class="f"><span>블록 (정답 순서대로 한 줄에 하나 · 앞 띄어쓰기도 그대로 지켜요 · 학생에게는 섞여서 나와요)</span><textarea id="eBlocks" class="mono" style="min-height:120px">${esc((b.blocks || []).join('\n'))}</textarea></label>
+      <label class="chk"><input type="checkbox" id="eTextBlocks"${b.text_blocks ? ' checked' : ''}> 코드가 아니라 글 블록이에요</label>`;
+    case 'match': return `<label class="f"><span>짝 (한 줄에 하나 · <code>왼쪽 =&gt; 오른쪽</code>)</span><textarea id="ePairs" style="min-height:120px">${esc((b.pairs || []).map(p => p[0] + ' => ' + p[1]).join('\n'))}</textarea></label>
+      <label class="chk"><input type="checkbox" id="eCodeLeft"${b.code_left ? ' checked' : ''}> 왼쪽이 코드예요</label>`;
+    case 'bug': return `<label class="f"><span>줄 (한 줄에 하나 · 앞 띄어쓰기도 그대로)</span><textarea id="eLines" class="mono" style="min-height:110px">${esc((b.lines || []).join('\n'))}</textarea></label>
+      <div class="grid2"><label class="f"><span>정답 줄 번호 (1부터)</span><input id="eLineNo" type="number" min="1" value="${(b.answer ?? 0) + 1}"></label>
+      <label class="chk" style="align-self:end"><input type="checkbox" id="ePlain"${b.plain ? ' checked' : ''}> 코드가 아니라 일반 글이에요</label></div>`;
+    case 'sort': {
+      const bk = b.buckets || ['', ''], items = b.items || [];
+      return `<div class="grid2">${[0, 1].map(k => `<div class="stack" style="gap:6px"><label class="f"><span>무리 ${k + 1} 이름</span><input id="eBk${k}" value="${esc(bk[k] || '')}" placeholder="${k ? '예: AI 아님' : '예: AI 기술'}"></label>
+        <label class="f"><span>무리 ${k + 1}에 들어갈 항목 (한 줄에 하나)</span><textarea id="eIt${k}">${esc(items.filter(i => Number(i[1]) === k).map(i => i[0]).join('\n'))}</textarea></label></div>`).join('')}</div>`;
+    }
+    case 'imgspot': {
+      const sp = b.spot || [30, 30, 30, 30];
+      return `${imgField('eImg', b.img)}
+        <div class="f"><span>정답 영역: 아래 그림에서 끌어서 네모를 그려요</span>
+          <div><span class="spotwrap" id="eSpotWrap"><img id="eSpotImg" src="${esc(b.img || '')}" alt="정답 영역 그리기" draggable="false"><span class="spotbox" id="eSpotBox" style="left:${sp[0]}%;top:${sp[1]}%;width:${sp[2]}%;height:${sp[3]}%"></span></span></div>
+          <div class="grid4">${['왼쪽 %', '위 %', '너비 %', '높이 %'].map((l, i) => `<label class="f"><span>${l}</span><input type="number" class="eSp" data-i="${i}" value="${sp[i]}" step="0.5"></label>`).join('')}</div></div>
+        <label class="f"><span>정답 설명 (예: 휴대폰 화면 속 QR 코드)</span><input id="eSpotLabel" value="${esc(b.spotLabel || '')}"></label>`;
+    }
+    case 'imgpick': return `<div class="grid2">${imgField('eImgA', (b.imgs || [])[0], 'A 그림')}${imgField('eImgB', (b.imgs || [])[1], 'B 그림')}</div>
+      <div class="f"><span>정답 (예: AI가 만든 그림)</span><div class="bar">${['A', 'B'].map((k, i) => `<label class="chk"><input type="radio" name="ePick" value="${i}"${b.answer === i ? ' checked' : ''}> ${k}</label>`).join('')}</div></div>`;
+  }
+  return '';
+}
+function imgField(id, v, label = '그림 주소') {
+  return `<label class="f"><span>${label} (깃허브 저장소의 img 폴더에 올리고 <code>img/파일이름.png</code> 처럼 적어요)</span><input id="${id}" class="mono" value="${esc(v || '')}" placeholder="img/파일이름.png"></label>`;
+}
+function bindSpot() {
+  const wrap = document.getElementById('eSpotWrap'); if (!wrap) return;
+  const img = document.getElementById('eSpotImg'), box = document.getElementById('eSpotBox'), inp = [...document.querySelectorAll('.eSp')];
+  const setBox = sp => { box.style.left = sp[0] + '%'; box.style.top = sp[1] + '%'; box.style.width = sp[2] + '%'; box.style.height = sp[3] + '%'; inp.forEach((el, i) => { el.value = sp[i]; }); };
+  const pt = e => { const r = img.getBoundingClientRect(); return [Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)), Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))]; };
+  let start = null;
+  wrap.onpointerdown = e => { start = pt(e); wrap.setPointerCapture(e.pointerId); };
+  wrap.onpointermove = e => { if (!start) return; const p = pt(e), r1 = v => Math.round(v * 2) / 2; setBox([r1(Math.min(start[0], p[0])), r1(Math.min(start[1], p[1])), r1(Math.abs(p[0] - start[0])), r1(Math.abs(p[1] - start[1]))]); };
+  wrap.onpointerup = () => { start = null; };
+  inp.forEach(el => { el.oninput = () => setBox(inp.map(x => Number(x.value) || 0)); });
+  document.getElementById('eImg').oninput = e => { img.src = e.target.value; };
+}
+/* 편집기 → 저장할 모양 */
+function collect(loose, asType) {
+  const t = asType || val('eType'), b = { q: val('eQ').trim() };
+  const code = val('eCode'); if (code.trim()) b.code = code.replace(/\s+$/, '');
+  const hint = val('eHint').trim(), why = val('eWhy').trim(); if (hint) b.hint = hint; if (why) b.why = why;
+  switch (t) {
+    case 'ox': case 'imgox': b.answer = (document.querySelector('input[name="eOX"]:checked') || {}).value || 'O'; if (t === 'imgox') b.img = val('eImg').trim(); break;
+    case 'mc': case 'multi': {
+      const opts = [...document.querySelectorAll('.eOpt')].map(x => x.value.trim());
+      const picked = [...document.querySelectorAll('input[name="eAns"]:checked')].map(x => Number(x.value));
+      const keep = opts.map((o, i) => ({ o, i })).filter(x => x.o !== '' || loose);
+      b.options = keep.map(x => x.o);
+      const re = i => keep.findIndex(x => x.i === i);
+      if (t === 'mc') b.answer = picked.length ? re(picked[0]) : -1; else b.answers = picked.map(re).filter(i => i >= 0);
+      break;
+    }
+    case 'input': b.answer = lines(val('eAnswers')).map(x => x.trim()); if (val('ePh').trim()) b.placeholder = val('ePh').trim(); break;
+    case 'fill': b.answer = lines(val('eAnswers')).map(x => x.trim()); b.chips = lines(val('eChips')).map(x => x.trim()); if (chk('ePlain')) b.plain = true; break;
+    case 'order': b.blocks = lines(val('eBlocks')); if (chk('eTextBlocks')) b.text_blocks = true; break;
+    case 'match': b.pairs = lines(val('ePairs')).map(l => { const k = l.indexOf('=>'); return k < 0 ? [l.trim(), ''] : [l.slice(0, k).trim(), l.slice(k + 2).trim()]; }); if (chk('eCodeLeft')) b.code_left = true; break;
+    case 'bug': b.lines = lines(val('eLines')); b.answer = Number(val('eLineNo')) - 1; if (chk('ePlain')) b.plain = true; break;
+    case 'sort': b.buckets = [val('eBk0').trim(), val('eBk1').trim()]; b.items = [0, 1].flatMap(k => lines(val('eIt' + k)).map(x => [x.trim(), k])); break;
+    case 'imgspot': b.img = val('eImg').trim(); b.spot = [...document.querySelectorAll('.eSp')].map(x => Number(x.value) || 0); if (val('eSpotLabel').trim()) b.spotLabel = val('eSpotLabel').trim(); break;
+    case 'imgpick': b.imgs = [val('eImgA').trim(), val('eImgB').trim()]; b.answer = Number((document.querySelector('input[name="ePick"]:checked') || {}).value || 0); break;
+  }
+  return { id: ED.id, area: val('eArea'), topic: val('eTopic').trim(), level: Number(val('eLevel')), type: t, active: chk('eActive'), body: b };
+}
+async function saveQ(btn) {
+  const q = collect(false);
+  btn.classList.add('busy');
+  try { await rpc('admin_save_question', { p_pw: PW, p: q }); closeModal(); toast('문제를 저장했어요'); await load(); }
+  catch (e) { document.getElementById('eErr').textContent = e.message; btn.classList.remove('busy'); }
+}
+
+/* ----- 설정 ----- */
+function viewSettings() {
+  const st = D.settings, base = new URL('./', location.href).href;
+  document.getElementById('body').innerHTML = `
+    <div class="grid2">
+      <div class="card stack">
+        <strong class="ftitle" style="font-size:22px">퀴즈 설정</strong>
+        <label class="f"><span>학교 이름</span><input id="sSchool" value="${esc(st.school)}"></label>
+        <label class="f"><span>퀴즈 이름</span><input id="sTitle" value="${esc(st.title)}"></label>
+        <label class="chk"><input type="checkbox" id="sOpen"${st.isOpen ? ' checked' : ''}> 퀴즈 열기 (끄면 새로 시작할 수 없어요 · 풀던 학생은 마저 풀 수 있어요)</label>
+        <label class="f"><span>문제당 제한 시간 (초)</span><input id="sLimit" type="number" min="20" max="180" value="${st.limit}"></label>
+        <div class="f"><span>등급 방식</span>
+          ${Object.entries(MODES).map(([k, m]) => `<label class="chk" style="align-items:flex-start"><input type="radio" name="sMode" value="${k}"${st.tierMode === k ? ' checked' : ''}><span><b>${m.label}</b><br><span class="note">${m.note}</span></span></label>`).join('')}
+        </div>
+        <label class="f"><span>새 관리자 비밀번호 (바꿀 때만 · 6글자 이상)</span><input id="sPw" type="password" autocomplete="new-password"></label>
+        <p class="err" id="sErr" role="alert"></p>
+        <button class="btn" data-act="saveSettings">설정 저장</button>
+      </div>
+      <div class="stack">
+        <div class="card stack">
+          <strong class="ftitle" style="font-size:22px">학생 참여 주소</strong>
+          <code style="word-break:break-all">${esc(base)}</code>
+          <div class="qr-box" id="sQr" style="background:#fff;border:3px solid var(--ink);border-radius:16px;padding:12px;line-height:0;align-self:flex-start;width:220px"></div>
+          <p class="help2">대시보드: <code>${esc(base)}dashboard.html</code> · TV에서 열면 큰 화면으로 바뀌고 QR도 함께 나와요.</p>
+        </div>
+        <div class="card stack">
+          <strong class="ftitle" style="font-size:22px">관리자 주소 · 선생님 휴대폰용</strong>
+          <code style="word-break:break-all">${esc(base)}admin.html</code>
+          <div class="qr-box" id="aQr" style="background:#fff;border:3px solid var(--ink);border-radius:16px;padding:12px;line-height:0;align-self:flex-start;width:180px"></div>
+          <p class="help2">휴대폰 카메라로 찍으면 관리자 페이지가 열려요. TV나 학생이 볼 수 있는 화면에는 띄우지 마세요. 비밀번호가 있어야 들어올 수 있어요.</p>
+        </div>
+        <div class="card stack" style="border-color:var(--bad)">
+          <strong class="ftitle" style="font-size:22px;color:var(--bad)">기록 초기화</strong>
+          <p class="help2">전체, 한 학년, 한 반 기록만 골라서 지울 수 있어요. 문제와 설정은 그대로예요. 위쪽 빨간 <b>기록 초기화</b> 버튼과 같아요.</p>
+          <button class="btn" style="background:var(--coral);color:#fff" data-act="askReset">기록 초기화 열기</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('sQr').innerHTML = qrSvg(base);
+  document.getElementById('aQr').innerHTML = qrSvg(base + 'admin.html');
+}
+async function saveSettings(btn) {
+  const p = { school: val('sSchool'), title: val('sTitle'), isOpen: chk('sOpen'), limit: Number(val('sLimit')), tierMode: (document.querySelector('input[name="sMode"]:checked') || {}).value };
+  const npw = val('sPw'); if (npw) p.newPassword = npw;
+  btn.classList.add('busy');
+  try { await rpc('admin_save_settings', { p_pw: PW, p }); if (npw) { PW = npw; ss.set('quiz_admin_pw', npw); if (ls.get('quiz_admin_pw')) ls.set('quiz_admin_pw', npw); } toast('설정을 저장했어요'); await load(); }
+  catch (e) { document.getElementById('sErr').textContent = e.message; btn.classList.remove('busy'); }
+}
+
+/* ----- 기록 초기화 창 -----
+   범위: 전체 / 한 학년 / 한 반. 몇 명이 지워지는지 미리 보여 주고, '초기화'라고 적어야 버튼이 켜져요. */
+const RS = { scope: 'all', grade: 1, cls: 1, typed: '' };
+const rsHit = a => RS.scope === 'all' || (a.grade === RS.grade && (RS.scope === 'grade' || a.cls === RS.cls));
+const maxCls = g => (D.settings.classes && D.settings.classes[g]) || 12;
+function resetModal() {
+  RS.cls = Math.min(RS.cls, maxCls(RS.grade));
+  const hit = D.attempts.filter(rsHit), done = hit.filter(a => a.finished).length;
+  const where = RS.scope === 'all' ? '전체' : RS.scope === 'grade' ? `${RS.grade}학년 전체` : `${RS.grade}학년 ${RS.cls}반`;
+  const opt = (n, v, unit) => Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${v === i + 1 ? ' selected' : ''}>${i + 1}${unit}</option>`).join('');
+  const ok = RS.typed.trim() === '초기화' && hit.length > 0;
+  const inner = `<strong class="ftitle" style="color:var(--bad)">기록 초기화</strong>
+    <div class="f"><span>어디를 지울까요?</span>
+      <div class="rs-scope">${[['all', '전체'], ['grade', '한 학년'], ['cls', '한 반']].map(([k, l]) => `<label class="chk"><input type="radio" name="rsScope" value="${k}"${RS.scope === k ? ' checked' : ''}> ${l}</label>`).join('')}</div>
+    </div>
+    ${RS.scope === 'all' ? '' : `<div class="rs-pick"><select class="sel" id="rsGrade" aria-label="학년">${opt(3, RS.grade, '학년')}</select>${RS.scope === 'cls' ? `<select class="sel" id="rsCls" aria-label="반">${opt(maxCls(RS.grade), RS.cls, '반')}</select>` : ''}</div>`}
+    <div class="rs-count"><b>${where}</b> 기록 <b class="big">${hit.length}명</b><span class="note">끝낸 학생 ${done}명 · 푸는 중 ${hit.length - done}명</span></div>
+    <p class="help2">문제와 설정은 그대로예요. 지운 기록은 되돌릴 수 없고, 대시보드 순위와 칭호도 남은 기록으로 다시 계산돼요.${hit.length - done ? ' 푸는 중인 학생은 처음부터 다시 시작해야 해요.' : ''}</p>
+    <button class="btn ghost small" data-act="csvAll">지우기 전에 전체 기록 CSV로 받기</button>
+    <label class="f"><span>확인을 위해 <b>초기화</b> 라고 적어 주세요</span><input id="rsConfirm" autocomplete="off" value="${esc(RS.typed)}" placeholder="초기화"></label>
+    <p class="err" id="rsErr" role="alert"></p>
+    <div class="btn-row"><button class="btn ghost" data-act="close">그만두기</button><button class="btn" id="rsGo" style="background:var(--coral);color:#fff" data-act="doReset"${ok ? '' : ' disabled'}>${hit.length}명 지우기</button></div>`;
+  // 이미 열려 있으면 안쪽만 바꿔요 (고를 때마다 창이 깜빡이지 않게)
+  const card = $layer.querySelector('.modal .card.rs');
+  if (card) card.innerHTML = inner; else { modal(inner); $layer.querySelector('.modal .card').classList.add('rs'); }
+}
+$layer.addEventListener('change', e => {
+  const t = e.target;
+  if (t.name === 'rsScope') RS.scope = t.value; else if (t.id === 'rsGrade') RS.grade = Number(t.value); else if (t.id === 'rsCls') RS.cls = Number(t.value); else return;
+  resetModal();
+});
+$layer.addEventListener('input', e => {
+  if (e.target.id !== 'rsConfirm') return;
+  RS.typed = e.target.value;
+  const n = D.attempts.filter(rsHit).length, go = document.getElementById('rsGo');
+  if (go) go.disabled = !(RS.typed.trim() === '초기화' && n > 0);
+});
+async function doReset(btn) {
+  btn.classList.add('busy'); btn.disabled = true;
+  try {
+    const r = await rpc('admin_reset', { p_pw: PW, p_confirm: RS.typed.trim(), p_grade: RS.scope === 'all' ? null : RS.grade, p_cls: RS.scope === 'cls' ? RS.cls : null });
+    RS.typed = ''; closeModal(); toast(`기록 ${r.deleted}명을 지웠어요`); await load();
+  } catch (e) { const el = document.getElementById('rsErr'); if (el) el.textContent = e.message; btn.classList.remove('busy'); btn.disabled = false; }
+}
+
+/* ---------- 눌렀을 때 ---------- */
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  if (b.classList.contains('modal') && e.target !== b) return;
+  const act = b.dataset.act, id = Number(b.dataset.id);
+  try {
+    switch (act) {
+      case 'close': closeModal(); break;
+      case 'tab': tab = b.dataset.v; render(); break;
+      case 'reload': await load(); toast('새로 불러왔어요'); break;
+      case 'logout': forgetPw(); viewLogin(); break;
+      case 'toggleOpen': await rpc('admin_save_settings', { p_pw: PW, p: { isOpen: !D.settings.isOpen } }); await load(); toast(D.settings.isOpen ? '퀴즈를 열었어요' : '퀴즈를 닫았어요'); break;
+      case 'sort': if (sortKey === b.dataset.v) sortDir = -sortDir; else { sortKey = b.dataset.v; sortDir = 1; } viewPeople(); break;
+      case 'csv': csv(); break;
+      case 'detail': showDetail(id); break;
+      case 'delAttempt': askDelAttempt(id); break;
+      case 'doDelAttempt': await rpc('admin_delete_attempt', { p_pw: PW, p_id: id }); closeModal(); toast('기록을 지웠어요'); await load(); break;
+      case 'newQ': openEditor(null); break;
+      case 'editQ': openEditor(D.questions.find(q => q.id === id)); break;
+      case 'toggleQ': { const q = D.questions.find(x => x.id === id); await rpc('admin_set_active', { p_pw: PW, p_id: id, p_active: !q.active }); q.active = !q.active; const y = scrollY; viewQuestions(); scrollTo(0, y); break; }
+      case 'addOpt': ED = collect(true); (ED.body.options = ED.body.options || []).push(''); drawEditor(); break;
+      case 'delOpt': { ED = collect(true); const i = Number(b.dataset.v); if (ED.body.options.length > 2) { ED.body.options.splice(i, 1); ED.body.answer = 0; ED.body.answers = (ED.body.answers || []).filter(x => x !== i).map(x => (x > i ? x - 1 : x)); } drawEditor(); break; }
+      case 'saveQ': saveQ(b); break;
+      case 'askDelQ': modal(`<strong class="ftitle">문제 #${ED.id}를 삭제할까요?</strong><p>지우면 되돌릴 수 없어요. 잠깐 빼고 싶으면 '출제' 스위치를 끄는 게 좋아요.</p><div class="btn-row"><button class="btn ghost" data-act="editQ" data-id="${ED.id}">돌아가기</button><button class="btn" style="background:var(--coral);color:#fff" data-act="doDelQ" data-id="${ED.id}">삭제</button></div>`); break;
+      case 'doDelQ': await rpc('admin_delete_question', { p_pw: PW, p_id: id }); closeModal(); toast('문제를 삭제했어요'); await load(); break;
+      case 'saveSettings': saveSettings(b); break;
+      case 'askReset': RS.typed = ''; resetModal(); break;
+      case 'doReset': doReset(b); break;
+      case 'csvAll': csv(true); break;
+    }
+  } catch (err) { toast(err.message); }
+});
+
+demoRibbon();
+(async () => { if (PW) await load(); else viewLogin(); })();
+</script>
+</body>
+</html>

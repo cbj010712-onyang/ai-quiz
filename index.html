@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI·코딩 퀴즈 챌린지</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main id="app" aria-live="polite"><p class="loading">불러오는 중…</p></main>
+<div id="dock"></div>
+<div id="layer"></div>
+
+<script src="config.js"></script>
+<script src="js/common.js"></script>
+<script src="js/mock.js"></script>
+<script>
+/* =====================================================================
+   학생 퀴즈 화면
+   - 정답은 서버에만 있어요. 답을 보내면 서버가 채점하고 시간도 서버가 재요.
+   - 새로고침해도 같은 학년·반·번호·이름이면 하던 곳부터 이어서 해요.
+   ===================================================================== */
+const DASHBOARD_URL = 'dashboard.html';
+const TURTLE = 'img/mascot.png';   // 학교 거북이 (휴대폰에 홍보 문구)
+const $app = document.getElementById('app'), $dock = document.getElementById('dock'), $layer = document.getElementById('layer');
+
+let S = { screen: 'loading', settings: null, items: [], i: 0, combo: 0, maxCombo: 0, checked: false, err: '', busy: false, fx: '', gain: 0, B: null };
+const LIMIT = () => (S.settings && S.settings.limit) || 60;
+const P = () => S.items[S.i];
+const rightCount = () => S.items.filter(p => p.result && p.result.correct).length;
+const scoreNow = () => (S.items.length ? Math.round(rightCount() * 100 / S.items.length) : 0);
+const stageOf = p => AREAS.indexOf(p.area);
+
+/* ---------- 서버 상태 → 화면용 문제 ---------- */
+function prepare(it) {
+  const v = it.view, p = { pos: it.pos, area: it.area, topic: it.topic, level: it.level, type: it.type, view: v, ui: {}, hintText: it.hint || '', result: it.result || null, elapsed: it.elapsed };
+  if (p.type === 'mc' || p.type === 'multi') p.opts = shuffle(v.options);
+  if (p.type === 'multi') p.ui.multi = [];
+  if (p.type === 'fill') { p.chips = v.chips; p.ui.fill = new Array((v.code.match(/\{\d\}/g) || []).length).fill(null); }
+  if (p.type === 'order') { p.blocks = v.blocks; p.ui.order = []; }
+  if (p.type === 'match') { p.left = v.left; p.right = v.right; p.ui.match = {}; p.ui.active = null; }
+  if (p.type === 'sort') { p.sitems = v.items; p.ui.sort = {}; }
+  if (p.ui.hint === undefined) p.ui.hint = !!it.hint;
+  return p;
+}
+function loadState(st) {
+  S.token = st.token; S.me = { grade: st.grade, cls: st.cls, num: st.num, name: st.name }; S.settings = st.settings;
+  S.items = st.items.map(prepare);
+  S.combo = 0; S.maxCombo = 0;
+  S.items.forEach(p => { if (p.result) { if (p.result.correct) { S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo); } else S.combo = 0; } });
+  store.set('quiz_session', { token: st.token, me: S.me });
+}
+
+/* ---------- 답 만들기 (서버로 보낼 모양: 보기 '글자') ---------- */
+function answered(p) {
+  const u = p.ui;
+  switch (p.type) {
+    case 'ox': case 'mc': case 'bug': case 'imgox': case 'imgpick': return u.pick !== undefined;
+    case 'imgspot': return !!u.tap;
+    case 'multi': return u.multi.length > 0;
+    case 'input': return !!(u.text && u.text.trim());
+    case 'fill': return u.fill.every(v => v !== null);
+    case 'order': return u.order.length === p.blocks.length;
+    case 'match': return Object.keys(u.match).length === p.left.length;
+    case 'sort': return Object.keys(u.sort).length === p.sitems.length;
+  }
+}
+function needMsg(p) { return { fill: '빈칸을 모두 채워요.', order: '블록을 모두 쌓아요.', match: '모든 짝을 맞춰요.', sort: '모든 항목을 나눠요.', input: '답을 적어요.', multi: '하나 이상 골라요.', imgspot: '그림에서 한 곳을 눌러요.' }[p.type] || '답을 골라요.'; }
+function toAnswer(p) {
+  const u = p.ui;
+  switch (p.type) {
+    case 'multi': return u.multi;
+    case 'input': return u.text;
+    case 'fill': return u.fill.map(ci => p.chips[ci]);
+    case 'order': return u.order.map(i => p.blocks[i]);
+    case 'match': return Object.entries(u.match).map(([l, r]) => [p.left[l], p.right[r]]);
+    case 'sort': return p.sitems.map((t, i) => [t, u.sort[i]]);
+    case 'imgspot': return u.tap;
+    default: return u.pick;
+  }
+}
+
+/* ---------- 타이머 (서버가 잰 시간에 맞춰요) ---------- */
+let tick = null;
+const remaining = () => Math.max(0, LIMIT() - (Date.now() - S.qStart) / 1000);
+function stopTimer() { if (tick) { clearInterval(tick); tick = null; } }
+function startTimer() { if (!tick) tick = setInterval(updTimer, 200); updTimer(); }
+function updTimer() {
+  if (S.screen !== 'quiz' || S.checked || !S.qStart) { stopTimer(); return; }
+  const r = remaining(), num = document.getElementById('tnum'), bar = document.getElementById('tbar');
+  if (num) { num.textContent = Math.ceil(r); num.classList.toggle('warn', r <= 10); }
+  if (bar) { bar.style.width = (r / LIMIT() * 100) + '%'; bar.style.background = r <= 10 ? '#FF5A5F' : r <= 30 ? '#FFD43B' : '#22C55E'; }
+  if (r <= 0) finish(true);
+}
+
+/* ---------- 화면 ---------- */
+let lastView = '';
+function render() {
+  const fn = { loading: viewLoading, start: viewStart, intro: viewIntro, quiz: viewQuiz, result: viewResult }[S.screen];
+  $app.innerHTML = fn();
+  const view = S.screen + (S.screen === 'quiz' ? ':' + S.i : ''), isNew = view !== lastView; lastView = view;
+  if (isNew && !REDUCED && $app.animate) [...$app.children].forEach((el, k) => el.animate([{ opacity: 0, transform: 'translateY(14px)' }, { opacity: 1, transform: 'none' }], { duration: 340, delay: k * 45, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' }));
+  $dock.innerHTML = S.screen === 'quiz' ? dockQuiz() : '';
+  $app.style.paddingBottom = '';
+  if (S.screen === 'quiz') { const d = $dock.firstElementChild; if (d) $app.style.paddingBottom = (d.offsetHeight + 16) + 'px'; }
+  if (isNew) window.scrollTo(0, 0);
+  if (S.screen === 'quiz' && !S.checked && S.qStart) { startTimer(); const inp = document.getElementById('ans'); if (inp && isNew && !TOUCH) inp.focus({ preventScroll: true }); }
+  if (!isTyping()) document.body.classList.remove('kb');
+  else stopTimer();
+  if (S.screen === 'result' && isNew) countUp();
+  const fx = S.fx; S.fx = '';
+  if (fx === 'ok') { confetti(document.querySelector('.score-pill')); buzz(25); }
+  if (fx === 'bad') { const c = $app.querySelector('.card'); if (c && c.animate && !REDUCED) c.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-8px)' }, { transform: 'translateX(8px)' }, { transform: 'translateX(-5px)' }, { transform: 'translateX(0)' }], { duration: 360 }); buzz([30, 40, 30]); }
+}
+const viewLoading = () => `<p class="loading">${esc(S.loadingMsg || '불러오는 중…')}</p>`;
+
+function viewStart() {
+  const st = S.settings, m = S.me || (store.get('quiz_session') || {}).me || store.get('quiz_me') || { grade: 1, cls: 1, num: '', name: '' };
+  const maxC = g => (st.classes && st.classes[g]) || 12;
+  const opt = (n, v, unit) => Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${Number(v) === i + 1 ? ' selected' : ''}>${i + 1}${unit}</option>`).join('');
+  return `<span class="pill" style="margin-top:auto" data-act="secret">${esc(st.school)} 정보·AI 행사</span>
+    <div class="hero"><h1 style="font-size:clamp(40px, 12vw, 54px)"><span class="blue">AI·코딩</span><br>퀴즈 <span class="tag">챌린지</span></h1><img src="${TURTLE}" alt="휴대폰을 든 거북이 캐릭터"></div>
+    ${st.isOpen ? '' : '<p class="err" role="alert" style="font-size:18px">지금은 퀴즈 시간이 아니에요. 선생님 안내를 기다려 주세요.</p>'}
+    <div class="card stack" style="gap:10px">
+      <strong class="ftitle">누가 도전하나요?</strong>
+      <div class="three">
+        <select class="sel" id="fGrade" aria-label="학년">${opt(3, m.grade, '학년')}</select>
+        <select class="sel" id="fCls" aria-label="반">${opt(maxC(m.grade), Math.min(m.cls, maxC(m.grade)), '반')}</select>
+        <select class="sel" id="fNum" aria-label="번호"><option value="">번호</option>${opt(40, m.num, '번')}</select>
+      </div>
+      <input class="sel" id="fName" type="text" autocomplete="off" maxlength="10" placeholder="이름" aria-label="이름" value="${esc(m.name || '')}">
+      ${S.err ? `<p class="err pop" role="alert">${esc(S.err)}</p>` : ''}
+      <div class="stages">${AREAS.map((a, i) => `<div class="a-${a}"><small>STAGE ${i + 1}</small>${a}</div>`).join('')}</div>
+      <div class="rules"><div><b>15문제</b>매번 랜덤</div><div><b>${LIMIT()}초</b>문제마다 제한</div><div><b>힌트</b>막히면 눌러요</div></div>
+    </div>
+    <button class="btn wide${S.busy ? ' busy' : ''}" data-act="start" id="startBtn">${S.busy ? '준비하는 중…' : '도전 시작!'}</button>
+    <p class="note" style="text-align:center;margin:0">첫 도전만 기록돼요. <button class="linkbtn" data-act="tiers" style="display:inline">등급표 보기</button></p>
+    <span style="margin-bottom:auto"></span>`;
+}
+
+function viewIntro() {
+  const p = P(), st = stageOf(p);
+  return `<div class="card intro stack pop center">
+    <span class="step">STAGE ${st + 1} / ${AREAS.length}</span>
+    <span class="name" style="color:${AREA_INFO[p.area].color}">${p.area}</span>
+    <span class="lead">${AREA_INFO[p.area].desc}</span>
+    ${S.i ? `<span class="lead" style="font-size:18px">지금 점수 <b>${scoreNow()}점</b></span>` : ''}
+    <button class="btn wide${S.busy ? ' busy' : ''}" data-act="go" id="goBtn">시작!</button>
+  </div>`;
+}
+
+function viewQuiz() {
+  const p = P(), total = S.items.length, r = S.checked ? 0 : remaining();
+  return `<div class="hud">
+      <div class="hud-row">
+        <span class="qno">문제 ${S.i + 1}<small>/ ${total}</small></span>
+        <span class="score-pill" aria-label="현재 점수">점수 <b>${scoreNow()}</b>점</span>
+        <span class="timer${S.checked ? ' stop' : ''}" id="tnum" aria-label="남은 시간(초)">${S.checked ? '-' : Math.ceil(r)}</span>
+      </div>
+      <div class="tbar-row"><div class="tbar"><span id="tbar" style="width:${S.checked ? 0 : r / LIMIT() * 100}%"></span></div>${S.combo >= 2 ? `<span class="combo${S.fx === 'ok' ? ' pop' : ''}">콤보 x${S.combo}</span>` : ''}</div>
+      <div class="dots" aria-hidden="true">${S.items.map((x, k) => `<span class="${x.result ? (x.result.correct ? 'o' : 'x') : ''}${k === S.i ? ' cur' : ''}"></span>`).join('')}</div>
+    </div>
+    <div class="card stack center ${S.checked ? 'locked' : ''}">
+      <div class="meta">
+        <span class="chip a-${p.area}">${p.area} · ${esc(p.topic)}</span>
+        <span class="stars" aria-label="난이도 별 ${p.level}개">${stars(p.level)}</span>
+        <span class="kind">${KIND[p.type]}</span>
+      </div>
+      <p class="qtext">${esc(p.view.q)}</p>
+      ${p.view.code && p.type !== 'fill' ? `<pre class="code">${esc(p.view.code)}</pre>` : ''}
+      ${answerArea(p)}
+      ${p.hintText ? `<div class="hint${S.fx === 'hint' ? ' pop' : ''}">${esc(p.hintText)}</div>` : (S.checked || !p.view.hasHint ? '' : '<button class="hint-btn" data-act="hint">힌트 보기</button>')}
+    </div>`;
+}
+
+function dockQuiz() {
+  const p = P(), last = S.i === S.items.length - 1;
+  if (!S.checked) return `<div class="dock"><div class="dock-in">${S.err ? `<p class="err pop" role="alert">${esc(S.err)}</p>` : ''}<button class="btn wide${S.busy ? ' busy' : ''}" data-act="check" id="checkBtn">${S.busy ? '채점 중…' : '확인'}</button></div></div>`;
+  const r = p.result, ok = r.correct;
+  const title = ok ? (S.combo >= 2 ? `정답! 콤보 x${S.combo}` : '정답!') : r.timeout ? '시간 초과!' : '아쉬워요!';
+  return `<div class="dock sheet ${ok ? 'good' : 'badf'}" role="status"><div class="dock-in">
+    <span class="big pop">${title}${ok ? ` <span style="font-size:22px">+${S.gain}점</span>` : ''}</span>
+    ${ok ? '' : `<span class="ans">정답: ${esc(r.answerText)}</span>`}
+    ${r.why ? `<span class="why">${esc(r.why)}</span>` : ''}
+    <button class="btn wide${S.busy ? ' busy' : ''}" data-act="next" id="nextBtn">${last ? (S.busy ? '기록하는 중…' : '결과 보기') : '다음 문제'}</button>
+  </div></div>`;
+}
+
+/* 답한 뒤 색칠: 서버가 준 정답(key)과 비교 */
+function mark(isRight, isPicked) { if (!S.checked) return ''; if (isRight) return ' is-ok'; if (isPicked) return ' is-bad'; return ''; }
+function answerArea(p) {
+  const u = p.ui, v = p.view, key = S.checked && p.result ? p.result.key : null;
+  const pic = src => `<img src="${esc(src)}" alt="문제 그림" draggable="false">`;
+  switch (p.type) {
+    case 'ox': case 'imgox':
+      return `${p.type === 'imgox' ? `<div class="pic">${pic(v.img)}</div>` : ''}<div class="opts ox">${['O', 'X'].map(k => `<button class="opt${mark(k === key, u.pick === k)}" data-act="pick" data-v="${k}" aria-pressed="${u.pick === k}"${p.type === 'imgox' ? ' style="min-height:76px;font-size:44px"' : ''}>${k}</button>`).join('')}</div>`;
+    case 'imgspot': {
+      const sp = key;
+      return `<div class="pic spot" data-act="tap" role="button" aria-label="그림에서 수상한 곳 누르기">${pic(v.img)}${sp ? `<span class="spotbox" style="left:${sp[0]}%;top:${sp[1]}%;width:${sp[2]}%;height:${sp[3]}%"></span>` : ''}${u.tap ? `<span class="tapmark${S.checked ? (p.result.correct ? ' ok' : ' no') : ''}" style="left:${u.tap.x}%;top:${u.tap.y}%"></span>` : ''}</div><p class="help" style="text-align:center">${u.tap ? '다른 곳을 누르면 다시 고를 수 있어요.' : '그림에서 수상한 곳을 손가락으로 눌러요.'}</p>`;
+    }
+    case 'imgpick':
+      return `<div class="pics">${v.imgs.map((src, i) => `<button class="opt pk${mark(i === key, u.pick === i)}" data-act="pick" data-v="${i}" aria-pressed="${u.pick === i}">${pic(src)}<span>${'AB'[i]}</span></button>`).join('')}</div>`;
+    case 'mc':
+      return `<div class="opts">${p.opts.map((o, k) => `<button class="opt${mark(o === key, u.pick === o)}" data-act="pick" data-k="${k}" aria-pressed="${u.pick === o}"><span class="box round"></span>${esc(o)}</button>`).join('')}</div>`;
+    case 'multi':
+      return `<p class="help">정답이 여러 개일 수 있어요.</p><div class="opts">${p.opts.map((o, k) => { const on = u.multi.includes(o); return `<button class="opt${mark(key && key.includes(o), on)}" data-act="multi" data-k="${k}" aria-pressed="${on}"><span class="box"></span>${esc(o)}</button>`; }).join('')}</div>`;
+    case 'input':
+      return `<label class="help" for="ans">답을 적고 확인을 눌러요</label><div class="ansrow"><input class="answer${S.checked ? (p.result.correct ? ' is-ok' : ' is-bad') : ''}" id="ans" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="${esc(v.placeholder || '')}" value="${esc(u.text || '')}" ${S.checked ? 'readonly' : ''}>${S.checked ? '' : '<button class="btn kbgo" data-act="check" type="button">확인</button>'}</div>`;
+    case 'fill': {
+      const parts = v.code.split(/(\{\d\})/).map(seg => {
+        const m = seg.match(/^\{(\d)\}$/);
+        if (!m) return esc(seg);
+        const i = Number(m[1]), ci = u.fill[i];
+        const ok = key ? (ci !== null && p.chips[ci] === key[i] ? ' is-ok' : ' is-bad') : '';
+        return `<button class="blank${ci !== null ? ' filled' : ''}${ok}" data-act="unfill" data-v="${i}" aria-label="빈칸 ${i + 1}">${ci !== null ? esc(p.chips[ci]) : '?'}</button>`;
+      }).join('');
+      const used = new Set(u.fill.filter(x => x !== null));
+      return `<pre class="code" style="${v.plain ? 'font-family:var(--body);white-space:pre-wrap' : ''}">${parts}</pre>
+        <p class="help">블록을 누르면 앞 빈칸부터 채워져요. 빈칸을 누르면 빠져요.</p>
+        <div class="toks">${p.chips.map((c, k) => `<button class="tok${v.plain ? ' word' : ''}" data-act="fill" data-v="${k}" ${used.has(k) ? 'disabled' : ''}>${esc(c)}</button>`).join('')}</div>`;
+    }
+    case 'order': {
+      const tc = v.text_blocks ? ' text' : '';
+      const slot = u.order.length
+        ? u.order.map((idx, n) => `<button class="blk${tc}${key ? (p.blocks[idx] === key[n] ? ' is-ok' : ' is-bad') : ''}" data-act="unorder" data-v="${n}"><b>${n + 1}</b>${esc(p.blocks[idx])}</button>`).join('')
+        : '<span class="ph">순서대로 눌러서 여기에 쌓아요</span>';
+      const left = p.blocks.map((t, idx) => ({ t, idx })).filter(b => !u.order.includes(b.idx));
+      return `<div class="slot">${slot}</div>${left.length ? `<div class="pool">${left.map(b => `<button class="blk${tc}" data-act="order" data-v="${b.idx}">${esc(b.t)}</button>`).join('')}</div>` : ''}`;
+    }
+    case 'match': {
+      const order = Object.keys(u.match).map(Number), no = l => order.indexOf(l);
+      const dot = n => n >= 0 ? `<span class="dot" style="background:${PAIR_COLORS[n % PAIR_COLORS.length]}">${n + 1}</span>` : '<span class="dot"></span>';
+      const ownerOf = r => { const l = Object.keys(u.match).find(k => u.match[k] === r); return l === undefined ? -1 : Number(l); };
+      const good = key ? new Set(key.map(pr => pr[0] + '\u001f' + pr[1])) : null;
+      const okPair = l => good && u.match[l] !== undefined && good.has(p.left[l] + '\u001f' + p.right[u.match[l]]);
+      let cells = '';
+      for (let k = 0; k < p.left.length; k++) {
+        const ro = ownerOf(k);
+        cells += `<button class="side${v.code_left ? ' code' : ''}${u.active === k ? ' active' : ''}${good ? (okPair(k) ? ' is-ok' : ' is-bad') : ''}" data-act="mleft" data-v="${k}" aria-pressed="${u.active === k}">${dot(no(k))}<span>${esc(p.left[k])}</span></button>`;
+        cells += `<button class="side${good ? (ro >= 0 && okPair(ro) ? ' is-ok' : ' is-bad') : ''}" data-act="mright" data-v="${k}">${dot(ro >= 0 ? no(ro) : -1)}<span>${esc(p.right[k])}</span></button>`;
+      }
+      return `<p class="help">왼쪽 → 오른쪽 순서로 눌러요. 같은 번호가 한 쌍이에요.</p><div class="match">${cells}</div>`;
+    }
+    case 'bug':
+      return `<div class="lines">${v.lines.map((ln, i) => `<button class="line${v.plain ? ' plain' : ''}${mark(i === key, u.pick === i)}" data-act="pick" data-v="${i}" aria-pressed="${u.pick === i}"><span class="ln">${i + 1}</span><span>${esc(ln)}</span></button>`).join('')}</div>`;
+    case 'sort': {
+      const km = key ? Object.fromEntries(key.map(([t, b]) => [t, Number(b)])) : null;
+      return `<div class="sorts">${p.sitems.map((t, i) => `<div class="sitem${km ? (u.sort[i] === km[t] ? ' is-ok' : ' is-bad') : ''}"><span>${esc(t)}</span><div class="two">${v.buckets.map((b, bi) => `<button class="bucket" data-act="sort" data-v="${i}" data-b="${bi}" aria-pressed="${u.sort[i] === bi}">${esc(b)}</button>`).join('')}</div></div>`).join('')}</div>`;
+    }
+  }
+  return '';
+}
+
+/* ---------- 결과 ---------- */
+function viewResult() {
+  const B = S.B, me = B.me, t = TIERS[me.tier];
+  const areas = AREAS.map((a, i) => `<span class="st" style="border-left-color:${AREA_INFO[a].color}">${a === '정보윤리' ? '윤리' : a} <b>${me.sr[i]}/5</b></span>`).join('');
+  const got = B.achs.filter(a => a.got).length, wrong = me.total - me.right;
+  return `<span class="pill">${me.grade}학년 ${me.cls}반 ${me.num}번 ${esc(S.me.name)}</span>
+    <div class="card stack center" style="gap:14px">
+      <div class="tierbox pop">
+        <button class="emb" data-act="tiers" aria-label="등급표 보기">${emblem(me.tier, 120, me.flawless)}</button>
+        <div class="stack" style="gap:2px">
+          <span class="tname" style="color:${t.c2}">${t.name}</span>
+          ${me.flawless ? '<span class="flaw">무결점 · 힌트 없이 만점</span>' : ''}
+          <span class="tsub">전체 <b>${me.rank}</b>등 / ${B.n}명</span>
+          <span class="tsub">걸린 시간 <b>${fmtTime(me.time)}</b></span>
+          <button class="linkbtn" data-act="tiers">등급표 보기</button>
+        </div>
+      </div>
+      <div class="scorerow">
+        <span class="score"><span id="score" data-to="${me.score}">${me.score}</span><small>점</small></span>
+        <span class="side-stats">맞힘 ${me.right}/${me.total}<br>콤보 x${me.combo}</span>
+      </div>
+      <div class="next">${B.next}</div>
+      ${B.mine.length ? `<div class="mytitles">${B.mine.map(x => `<span class="tchip">${titleIcon(x.id, 26)}${x.name}</span>`).join('')}</div>` : ''}
+      <div class="stline">${areas}</div>
+      <button class="achs" data-act="achs" aria-label="업적 ${got}개 보기"><span class="achs-h"><b>업적</b> ${got} / ${ACH.length}<span class="more">눌러서 보기</span></span><span class="achs-row">${B.achs.map((a, k) => `<span class="ach${a.got ? '' : ' off'}" style="animation-delay:${300 + k * 60}ms">${icon(a.icon, 30, a.bg)}</span>`).join('')}</span></button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" data-act="save" id="saveBtn">이미지 저장</button>
+      <a class="btn blue" href="${DASHBOARD_URL}">대시보드</a>
+    </div>
+    <div class="btn-row">
+      <button class="btn ghost small" data-act="review">${wrong ? `틀린 문제 ${wrong}개` : '문제 돌아보기'}</button>
+      <button class="btn ghost small" data-act="other">다른 학생 참여</button>
+    </div>`;
+}
+function countUp() {
+  const el = document.getElementById('score'); if (!el || REDUCED) return;
+  const to = Number(el.dataset.to), t0 = performance.now();
+  const step = t => { const k = Math.min(1, (t - t0) / 900); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+
+/* ---------- 팝업 ---------- */
+function modal(inner) { $layer.innerHTML = `<div class="modal" data-act="close"><div class="card stack" style="gap:12px">${inner}</div></div>`; }
+const H2 = t => `<strong style="font-family:var(--display);font-weight:400;font-size:26px">${t}</strong>`;
+function showTiers() {
+  const mode = S.settings.tierMode, cur = S.B && S.B.me ? S.B.me.tier : -1;
+  modal(`${H2('등급표 · ' + MODES[mode].label + ' 기준')}${tierGrid(mode, cur)}<p class="note">${MODES[mode].note}</p><div class="tchip" style="border-radius:16px;padding:4px 12px 4px 4px">${emblem(9, 48, true)}<span>힌트를 한 번도 안 쓰고 만점이면 <b>무결점</b> 월계관이 붙어요!</span></div><button class="btn wide" data-act="close">닫기</button>`);
+}
+function showAchs() {
+  const B = S.B;
+  modal(`${H2(`업적 ${B.achs.filter(a => a.got).length} / ${ACH.length}`)}<div class="stack" style="gap:6px;max-height:60svh;overflow-y:auto">${B.achs.map(a => `<div class="achrow${a.got ? ' got' : ''}">${icon(a.icon, 36, a.bg)}<div><b>${a.name}</b><div class="note">${a.desc}</div></div><span class="ok">${a.got ? '달성!' : '도전 중'}</span></div>`).join('')}</div><p class="note">대시보드 '칭호' 탭에는 학교 전체에서 단 한 명만 가질 수 있는 칭호가 있어요.</p><button class="btn wide" data-act="close">닫기</button>`);
+}
+function showReview() {
+  const list = S.items.map((p, i) => ({ p, i })).sort((a, b) => (a.p.result.correct ? 1 : 0) - (b.p.result.correct ? 1 : 0));
+  modal(`${H2('문제 돌아보기')}<div class="stack" style="gap:8px;max-height:60svh;overflow-y:auto">${list.map(({ p, i }) => { const r = p.result; return `<div class="rv"><span class="mk ${r.correct ? 'o' : 'x'}" aria-label="${r.correct ? '정답' : '오답'}">${r.correct ? 'O' : 'X'}</span><div><div class="t">${i + 1}. ${esc(p.view.q)}</div><div class="s">${p.area} · ${KIND[p.type]} · ${r.timeout ? '시간 초과' : fmtTime(r.time || 0)}${p.ui.hint ? ' · 힌트' : ''}</div>${r.correct ? '' : `<div class="s" style="color:var(--ok);font-weight:700;white-space:pre-line">정답: ${esc(r.answerText)}</div><div class="s">${esc(r.why || '')}</div>`}</div></div>`; }).join('')}</div><button class="btn wide" data-act="close">닫기</button>`);
+}
+
+/* ---------- 결과 이미지 ---------- */
+function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function fitFont(ctx, text, maxW, size, family) { let s = size; ctx.font = `${s}px ${family}`; while (ctx.measureText(text).width > maxW && s > 20) { s -= 2; ctx.font = `${s}px ${family}`; } }
+const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+async function makeImage() {
+  const B = S.B, me = B.me, t = TIERS[me.tier], st = S.settings;
+  try { await Promise.all(["80px 'Black Han Sans'", "40px 'Jua'", "700 30px 'Noto Sans KR'"].map(f => document.fonts.load(f))); } catch (e) {}
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d'), D = "'Black Han Sans', 'Noto Sans KR', sans-serif", J = "'Jua', 'Noto Sans KR', sans-serif", F = "'Noto Sans KR', sans-serif";
+  ctx.fillStyle = '#FFF3C4'; ctx.fillRect(0, 0, W, H);
+  [[900, 120, 120, '#FF8FA3'], [70, 760, 80, '#7CC4FF'], [1010, 1000, 60, '#8BE3A8']].forEach(([x, y, r, col]) => { ctx.globalAlpha = .55; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); });
+  ctx.globalAlpha = 1; ctx.textAlign = 'left';
+  const chip = `${st.school} · ${me.grade}학년 ${me.cls}반 ${S.me.name}`; fitFont(ctx, chip, 680, 32, J);
+  const cw = ctx.measureText(chip).width + 52;
+  ctx.fillStyle = '#FFFFFF'; rr(ctx, 70, 64, cw, 62, 31); ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = '#1B1B2F'; ctx.stroke();
+  ctx.fillStyle = '#1B1B2F'; ctx.fillText(chip, 96, 106);
+  ctx.font = `86px ${D}`; ctx.fillStyle = '#1D4ED8'; ctx.fillText('AI·코딩', 70, 236);
+  const tw = ctx.measureText('AI·코딩 ').width; ctx.fillStyle = '#1B1B2F'; ctx.fillText('퀴즈 챌린지', 70 + tw, 236);
+  ctx.fillStyle = '#1B1B2F'; rr(ctx, 82, 302, 928, 940, 44); ctx.fill();
+  ctx.fillStyle = '#FFFFFF'; rr(ctx, 70, 290, 928, 940, 44); ctx.fill(); ctx.lineWidth = 6; ctx.stroke();
+  const tt = await loadImg(TURTLE); if (tt) ctx.drawImage(tt, 840, 18, 210, 280);
+  const em = await loadImg('data:image/svg+xml;charset=utf-8,' + encodeURIComponent(emblem(me.tier, 340, me.flawless))); if (em) ctx.drawImage(em, 370, 312, 340, 340);
+  ctx.textAlign = 'center'; ctx.font = `84px ${D}`;
+  if (me.flawless) {
+    const nw = ctx.measureText(t.name).width; ctx.font = `40px ${J}`; const fw = ctx.measureText('무결점').width + 44, x0 = W / 2 - (nw + 20 + fw) / 2;
+    ctx.fillStyle = '#FFD43B'; rr(ctx, x0 + nw + 20, 682, fw, 64, 32); ctx.fill(); ctx.lineWidth = 4; ctx.stroke();
+    ctx.fillStyle = '#1B1B2F'; ctx.fillText('무결점', x0 + nw + 20 + fw / 2, 728);
+    ctx.font = `84px ${D}`; ctx.textAlign = 'left'; ctx.fillStyle = t.c2; ctx.fillText(t.name, x0, 740); ctx.textAlign = 'center';
+  } else { ctx.fillStyle = t.c2; ctx.fillText(t.name, W / 2, 740); }
+  ctx.font = `200px ${D}`; ctx.fillStyle = '#1B1B2F'; const sc = String(me.score), sw = ctx.measureText(sc).width;
+  ctx.fillText(sc, W / 2 - 34, 950); ctx.font = `68px ${D}`; ctx.fillText('점', W / 2 - 34 + sw / 2 + 42, 950);
+  [['전체 등수', `${me.rank}등 / ${B.n}명`], ['걸린 시간', fmtTime(me.time)], ['맞힌 문제', `${me.right} / ${me.total}`]].forEach(([k, v], i) => {
+    const x = 110 + i * 292; ctx.fillStyle = '#FFF8DC'; rr(ctx, x, 1000, 268, 170, 26); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#1B1B2F'; ctx.stroke();
+    ctx.fillStyle = '#4A4A60'; ctx.font = `700 30px ${F}`; ctx.fillText(k, x + 134, 1054);
+    ctx.fillStyle = '#1B1B2F'; fitFont(ctx, v, 240, 56, D); ctx.fillText(v, x + 134, 1132);
+  });
+  const d = new Date(); ctx.font = `34px ${J}`; ctx.fillStyle = '#1B1B2F';
+  ctx.fillText(`${d.getFullYear()}. ${d.getMonth() + 1}. ${d.getDate()}.  ·  ${B.next}`, W / 2, 1300);
+  return new Promise(res => c.toBlob(b => res({ blob: b, url: c.toDataURL('image/png'), name: `AI퀴즈_${t.name}_${me.score}점.png` }), 'image/png'));
+}
+let lastImg = null, downloadsP = null;
+const getDownloads = () => (downloadsP = downloadsP || ((window.claude && typeof window.claude.use === 'function') ? window.claude.use('downloads').catch(() => null) : Promise.resolve(undefined)));
+async function openPreview(btn) {
+  btn.classList.add('busy'); const label = btn.textContent; btn.textContent = '만드는 중…';
+  try {
+    lastImg = await makeImage();
+    const dl = await getDownloads();
+    modal(`${H2('결과 이미지')}<img class="shot" src="${lastImg.url}" alt="퀴즈 결과 이미지">
+      <div class="btn-row">${dl === null ? '' : '<button class="btn" data-act="dosave">저장하기</button>'}<button class="btn ghost" data-act="close"${dl === null ? ' style="grid-column:1 / -1"' : ''}>닫기</button></div>
+      <p class="note">휴대폰에서는 이미지를 길게 눌러 사진에 저장할 수도 있어요.</p>`);
+  } catch (e) { toast('이미지를 만들지 못했어요. 다시 눌러 주세요'); }
+  btn.classList.remove('busy'); btn.textContent = label;
+}
+async function doSave() {
+  if (!lastImg) return;
+  const dl = await getDownloads();
+  if (dl) {
+    try { await dl.save({ filename: lastImg.name, data: lastImg.blob }); toast('이미지를 저장했어요'); }
+    catch (e) { toast(e && e.code === 'declined' ? '저장을 취소했어요' : '이미지를 길게 눌러 저장해 주세요'); }
+  } else {
+    const a = document.createElement('a'); a.href = lastImg.url; a.download = lastImg.name; document.body.appendChild(a); a.click(); a.remove();
+    toast('이미지를 내려받았어요');
+  }
+}
+
+/* ---------- 흐름 ---------- */
+function oops(e) { S.busy = false; S.err = e && e.user ? e.message : (e && e.message) || '문제가 생겼어요. 다시 눌러 주세요.'; if (S.screen === 'quiz') { $dock.innerHTML = dockQuiz(); } else render(); }
+async function submitWho() {
+  if (S.busy) return;
+  const g = Number(document.getElementById('fGrade').value), c = Number(document.getElementById('fCls').value), n = Number(document.getElementById('fNum').value), name = document.getElementById('fName').value.trim().replace(/\s+/g, '');
+  S.me = { grade: g, cls: c, num: n || '', name };
+  if (!n) { S.err = '번호를 골라 주세요.'; render(); return; }
+  if (name.length < 2) { S.err = '이름을 두 글자 이상 적어 주세요.'; render(); return; }
+  S.err = ''; S.busy = true; store.set('quiz_me', S.me); render();
+  try {
+    const st = await rpc('quiz_start', { p_grade: g, p_cls: c, p_num: n, p_name: name });
+    S.busy = false; await enter(st);
+  } catch (e) { oops(e); }
+}
+/* 서버 상태로 들어가기 (처음 · 이어서 · 이미 끝남) */
+async function enter(st) {
+  loadState(st);
+  if (st.done) { await showResult(); return; }
+  const k = S.items.findIndex(p => !p.result);
+  if (k < 0) { await finishAll(); return; }
+  S.i = k; S.checked = false;
+  const p = P();
+  if (p.elapsed === null && (k === 0 || S.items[k - 1].area !== p.area)) { S.screen = 'intro'; render(); }
+  else await openQuestion();
+}
+async function openQuestion() {
+  const p = P();
+  S.busy = true; if (S.screen !== 'intro') { S.screen = 'loading'; S.loadingMsg = '문제를 불러오는 중…'; render(); } else render();
+  try {
+    const r = await rpc('quiz_open', { p_token: S.token, p_pos: p.pos });
+    S.qStart = Date.now() - r.elapsed * 1000; S.busy = false; S.checked = false; S.err = ''; S.screen = 'quiz'; render();
+    if (remaining() <= 0) finish(true);
+  } catch (e) { S.busy = false; S.screen = 'start'; S.err = e.message; render(); }
+}
+async function finish(timeout) {
+  if (S.checked || S.busy) return;
+  const p = P();
+  if (p.type === 'input') { const el = document.getElementById('ans'); if (el) p.ui.text = el.value; }
+  if (!timeout && !answered(p)) { S.err = needMsg(p); $dock.innerHTML = dockQuiz(); if (isTyping()) toast(S.err); return; }
+  stopTimer(); S.busy = true; S.err = ''; $dock.innerHTML = dockQuiz();
+  try {
+    const before = scoreNow();
+    p.result = await rpc('quiz_answer', { p_token: S.token, p_pos: p.pos, p_answer: timeout ? null : toAnswer(p) });
+    S.gain = scoreNow() - before;
+    if (p.result.correct) { S.combo++; S.maxCombo = Math.max(S.maxCombo, S.combo); } else S.combo = 0;
+    S.busy = false; S.checked = true; S.fx = p.result.correct ? 'ok' : 'bad';
+    render();
+  } catch (e) { S.busy = false; if (timeout) setTimeout(() => finish(true), 1500); oops(e); }
+}
+async function next() {
+  if (S.busy) return;
+  if (S.i === S.items.length - 1) { await finishAll(); return; }
+  S.i++; S.checked = false; S.err = '';
+  const p = P();
+  if (p.area !== S.items[S.i - 1].area) { S.screen = 'intro'; render(); }
+  else await openQuestion();
+}
+async function finishAll() {
+  S.busy = true; render();
+  try { await rpc('quiz_finish', { p_token: S.token }); S.busy = false; await showResult(); }
+  catch (e) { oops(e); }
+}
+async function showResult() {
+  S.screen = 'loading'; S.loadingMsg = '순위를 계산하는 중…'; render();
+  try {
+    if (!S.items.length || S.items.some(p => !p.result)) { const rv = await rpc('quiz_review', { p_token: S.token }); if (rv) loadState(rv); }
+    const stats = await rpc('quiz_stats', { p_token: S.token });
+    S.B = buildBoard(stats); S.settings = stats.settings;
+    if (!S.B.me) throw new QuizError('기록을 찾지 못했어요. 잠시 뒤 다시 열어 주세요.', true);
+    S.screen = 'result'; render();
+  } catch (e) { S.screen = 'start'; S.err = e.message; render(); }
+}
+
+/* ---------- 눌렀을 때 ---------- */
+function onAct(b, ev) {
+  const act = b.dataset.act, v = b.dataset.v;
+  const p = S.items[S.i], u = p && p.ui;
+  switch (act) {
+    case 'start': submitWho(); return;
+    case 'secret': secretTap(); return;
+    case 'go': openQuestion(); return;
+    case 'check': finish(false); return;
+    case 'next': next(); return;
+    case 'save': openPreview(b); return;
+    case 'dosave': doSave(); return;
+    case 'tiers': showTiers(); return;
+    case 'review': showReview(); return;
+    case 'achs': showAchs(); return;
+    case 'close': $layer.innerHTML = ''; return;
+    case 'other': store.del('quiz_session'); store.del('quiz_me'); S = { ...S, screen: 'start', items: [], token: null, me: null, B: null, err: '' }; render(); return;
+  }
+  if (S.screen !== 'quiz' || S.checked || S.busy) return;
+  if (u && p.type === 'input') { const el = document.getElementById('ans'); if (el) u.text = el.value; }
+  S.err = '';
+  switch (act) {
+    case 'hint':
+      if (p.hintText) return;
+      b.classList.add('busy');
+      rpc('quiz_hint', { p_token: S.token, p_pos: p.pos }).then(r => { p.hintText = r.hint; u.hint = true; S.fx = 'hint'; const y = scrollY; render(); scrollTo(0, y); }, e => { b.classList.remove('busy'); toast(e.message); });
+      return;
+    case 'pick': u.pick = (p.type === 'ox' || p.type === 'imgox') ? v : p.type === 'mc' ? p.opts[Number(b.dataset.k)] : Number(v); break;
+    case 'tap': { const img = b.querySelector('img'), r = img.getBoundingClientRect(); u.tap = { x: Math.round((ev.clientX - r.left) / r.width * 1000) / 10, y: Math.round((ev.clientY - r.top) / r.height * 1000) / 10 }; break; }
+    case 'multi': { const o = p.opts[Number(b.dataset.k)]; u.multi = u.multi.includes(o) ? u.multi.filter(x => x !== o) : u.multi.concat(o); break; }
+    case 'fill': { const i = u.fill.indexOf(null); if (i >= 0) u.fill[i] = Number(v); break; }
+    case 'unfill': u.fill[Number(v)] = null; break;
+    case 'order': { const n = Number(v); if (!u.order.includes(n)) u.order.push(n); break; }
+    case 'unorder': u.order.splice(Number(v), 1); break;
+    case 'mleft': { const n = Number(v); if (u.match[n] !== undefined) { delete u.match[n]; u.active = null; } else u.active = u.active === n ? null : n; break; }
+    case 'mright': {
+      const r = Number(v), owner = Object.keys(u.match).find(l => u.match[l] === r);
+      if (u.active === null) { if (owner !== undefined) delete u.match[owner]; break; }
+      if (owner !== undefined) delete u.match[owner];
+      u.match[u.active] = r; u.active = null; break;
+    }
+    case 'sort': u.sort[Number(v)] = Number(b.dataset.b); break;
+  }
+  render();
+}
+[$app, $dock].forEach(el => el.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b) onAct(b, e); }));
+$layer.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (!b) return; if (b.classList.contains('modal') && e.target !== b) return; onAct(b, e); });
+$app.addEventListener('input', e => { if (e.target.id === 'ans' && P()) P().ui.text = e.target.value; });
+
+/* ---------- 숨은 관리자 입구 ----------
+   시작 화면의 학교 이름 배지를 2초 안에 5번 누르면 관리자 페이지로 가요. (비밀번호는 거기서 따로 물어봐요) */
+let secretTaps = [];
+function secretTap() {
+  const now = Date.now(); secretTaps = secretTaps.filter(t => now - t < 2000).concat(now);
+  if (secretTaps.length >= 5) { secretTaps = []; location.href = 'admin.html'; }
+}
+
+/* ---------- 휴대폰 키보드가 문제를 가리지 않게 ----------
+   키보드가 올라오면(입력칸에 손가락을 대면) body에 kb 표시를 붙여요.
+   kb일 때: 아래 확인 바는 숨기고 입력칸 옆 확인 버튼을 보여 주고, 위 정보줄도 얇게 줄여요.
+   그리고 입력칸 아래쪽이 키보드 바로 위에 오도록 화면을 올려서, 그 위의 문제와 코드가 최대한 보이게 해요. */
+const TOUCH = matchMedia('(pointer: coarse)').matches, VV = window.visualViewport;
+function isTyping() { const a = document.activeElement; return !!a && a.tagName === 'INPUT' && $app.contains(a) && !a.readOnly; }
+function fitKeyboard() {
+  if (!isTyping()) return;
+  const el = document.activeElement, row = el.closest('.ansrow') || el;
+  const seeTop = VV ? VV.offsetTop : 0, seeH = VV ? VV.height : innerHeight;
+  const gap = row.getBoundingClientRect().bottom - (seeTop + seeH - 12);   // 양수면 입력칸이 키보드 밑에 있어요
+  if (Math.abs(gap) > 4) window.scrollBy(0, gap);
+}
+let kbTimer = 0;
+$app.addEventListener('focusin', e => {
+  if (!isTyping()) return;
+  clearTimeout(kbTimer); document.body.classList.add('kb');
+  [60, 320, 650].forEach(ms => setTimeout(fitKeyboard, ms));   // 키보드가 올라오는 속도가 휴대폰마다 달라요
+});
+$app.addEventListener('focusout', () => { kbTimer = setTimeout(() => { if (!isTyping()) document.body.classList.remove('kb'); }, 200); });
+if (VV) VV.addEventListener('resize', () => { if (document.body.classList.contains('kb')) fitKeyboard(); });
+// 입력칸 옆 확인 버튼을 눌러도 키보드가 먼저 내려가지 않게(눌렀을 때 화면이 흔들리지 않게)
+$app.addEventListener('pointerdown', e => { if (e.target.closest('.kbgo')) e.preventDefault(); });
+$app.addEventListener('mousedown', e => { if (e.target.closest('.kbgo')) e.preventDefault(); });
+$app.addEventListener('keydown', e => { if (e.target.id === 'ans' && e.key === 'Enter') { e.preventDefault(); finish(false); } if (e.target.id === 'fName' && e.key === 'Enter') { e.preventDefault(); submitWho(); } });
+$app.addEventListener('change', e => {
+  if (e.target.id !== 'fGrade') return;
+  const c = document.getElementById('fCls'), max = (S.settings.classes && S.settings.classes[e.target.value]) || 12, cur = Math.min(Number(c.value), max);
+  c.innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}"${cur === i + 1 ? ' selected' : ''}>${i + 1}반</option>`).join('');
+});
+
+/* ---------- 시작 ---------- */
+(async function boot() {
+  demoRibbon();
+  try { S.settings = await rpc('quiz_info'); }
+  catch (e) { $app.innerHTML = `<div class="card stack center"><strong class="ftitle">연결할 수 없어요</strong><p>${esc(e.message)}</p><button class="btn wide" onclick="location.reload()">다시 시도</button></div>`; return; }
+  const sess = store.get('quiz_session');
+  if (sess && sess.me && sess.me.name) {   // 새로고침·다시 열기 → 이어서
+    try { await enter(await rpc('quiz_start', { p_grade: sess.me.grade, p_cls: sess.me.cls, p_num: sess.me.num, p_name: sess.me.name })); return; }
+    catch (e) { store.del('quiz_session'); }
+  }
+  S.screen = 'start'; render();
+})();
+</script>
+</body>
+</html>
