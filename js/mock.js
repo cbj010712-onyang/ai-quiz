@@ -6,7 +6,7 @@
    ===================================================================== */
 'use strict';
 (function () {
-  const KEY = 'quizDemoDB_v4', ADMIN_PW = 'admin1234';
+  const KEY = 'quizDemoDB_v6', ADMIN_PW = 'admin1234';
   let db = null, ready = null;
   const fail = m => { throw new QuizError(m, true); };
   const clone = x => (x === undefined ? null : JSON.parse(JSON.stringify(x)));
@@ -40,7 +40,7 @@
         case 'match': return a.length === b.pairs.length && listEq(a.map(p => p[0] + '\u001f' + p[1]), b.pairs.map(p => p[0] + '\u001f' + p[1]));
         case 'sort': return a.length === b.items.length && listEq(a.map(p => p[0] + '\u001f' + p[1]), b.items.map(p => p[0] + '\u001f' + p[1]));
         case 'bug': case 'imgpick': return Number(a) === Number(b.answer);
-        case 'imgspot': { const [x, y, w, h] = b.spot; return a.x >= x && a.x <= x + w && a.y >= y && a.y <= y + h; }
+        case 'imgspot': { const inR = r => Array.isArray(r) && r.length === 4 && a.x >= r[0] && a.x <= r[0] + r[2] && a.y >= r[1] && a.y <= r[1] + r[3]; return inR(b.spot) || inR(b.spot2); }
       }
     } catch (e) {}
     return false;
@@ -53,7 +53,7 @@
       case 'order': return b.blocks;
       case 'match': return b.pairs;
       case 'sort': return b.items;
-      case 'imgspot': return b.spot;
+      case 'imgspot': return [b.spot].concat(Array.isArray(b.spot2) && b.spot2.length === 4 ? [b.spot2] : []);
       default: return b.answer;
     }
   }
@@ -97,7 +97,7 @@
       case 'match': if (len(b.pairs) < 2) fail('짝을 2개 이상 적어 주세요.'); if (!uniq(b.pairs.map(p => p[0])) || !uniq(b.pairs.map(p => p[1]))) fail('짝 글자가 서로 달라야 해요.'); break;
       case 'sort': if (len(b.buckets) !== 2) fail('분류 이름을 2개 적어 주세요.'); if (len(b.items) < 2) fail('분류할 항목을 2개 이상 적어 주세요.'); break;
       case 'bug': if (len(b.lines) < 2) fail('줄을 2개 이상 적어 주세요.'); if (!(b.answer >= 0 && b.answer < b.lines.length)) fail('정답 줄을 골라 주세요.'); break;
-      case 'imgspot': if (!b.img) fail('그림 주소를 적어 주세요.'); if (len(b.spot) !== 4) fail('그림에서 정답 영역을 지정해 주세요.'); break;
+      case 'imgspot': if (!b.img) fail('그림 주소를 적어 주세요.'); if (len(b.spot) !== 4) fail('그림에서 정답 영역을 지정해 주세요.'); if (b.spot2 && ![0, 4].includes(len(b.spot2))) fail('정답 영역 2의 숫자 4개를 모두 적어 주세요.'); break;
       case 'imgpick': if (len(b.imgs) !== 2) fail('그림 주소 2개를 적어 주세요.'); break;
     }
     if (t === 'imgox' && !b.img) fail('그림 주소를 적어 주세요.');

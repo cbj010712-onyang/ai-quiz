@@ -194,15 +194,16 @@ function mark(isRight, isPicked) { if (!S.checked) return ''; if (isRight) retur
 function answerArea(p) {
   const u = p.ui, v = p.view, key = S.checked && p.result ? p.result.key : null;
   const pic = src => `<img src="${esc(src)}" alt="문제 그림" draggable="false">`;
+  const zoom = `<button class="zoombtn" data-act="zoom" type="button"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M15 15l6 6M10 7v6M7 10h6" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>그림 크게 보기</button>`;
   switch (p.type) {
     case 'ox': case 'imgox':
-      return `${p.type === 'imgox' ? `<div class="pic">${pic(v.img)}</div>` : ''}<div class="opts ox">${['O', 'X'].map(k => `<button class="opt${mark(k === key, u.pick === k)}" data-act="pick" data-v="${k}" aria-pressed="${u.pick === k}"${p.type === 'imgox' ? ' style="min-height:76px;font-size:44px"' : ''}>${k}</button>`).join('')}</div>`;
+      return `${p.type === 'imgox' ? `<div class="pic">${pic(v.img)}</div>${zoom}` : ''}<div class="opts ox">${['O', 'X'].map(k => `<button class="opt${mark(k === key, u.pick === k)}" data-act="pick" data-v="${k}" aria-pressed="${u.pick === k}"${p.type === 'imgox' ? ' style="min-height:76px;font-size:44px"' : ''}>${k}</button>`).join('')}</div>`;
     case 'imgspot': {
-      const sp = key;
-      return `<div class="pic spot" data-act="tap" role="button" aria-label="그림에서 수상한 곳 누르기">${pic(v.img)}${sp ? `<span class="spotbox" style="left:${sp[0]}%;top:${sp[1]}%;width:${sp[2]}%;height:${sp[3]}%"></span>` : ''}${u.tap ? `<span class="tapmark${S.checked ? (p.result.correct ? ' ok' : ' no') : ''}" style="left:${u.tap.x}%;top:${u.tap.y}%"></span>` : ''}</div><p class="help" style="text-align:center">${u.tap ? '다른 곳을 누르면 다시 고를 수 있어요.' : '그림에서 수상한 곳을 손가락으로 눌러요.'}</p>`;
+      const rects = key ? (Array.isArray(key[0]) ? key : [key]) : [];   // 정답 영역 1~2개
+      return `<div class="pic spot" data-act="tap" role="button" aria-label="그림에서 수상한 곳 누르기">${pic(v.img)}${rects.map(sp => `<span class="spotbox" style="left:${sp[0]}%;top:${sp[1]}%;width:${sp[2]}%;height:${sp[3]}%"></span>`).join('')}${u.tap ? `<span class="tapmark${S.checked ? (p.result.correct ? ' ok' : ' no') : ''}" style="left:${u.tap.x}%;top:${u.tap.y}%"></span>` : ''}</div><p class="help" style="text-align:center">${u.tap ? '다른 곳을 누르면 다시 고를 수 있어요.' : '그림에서 수상한 곳을 손가락으로 눌러요. 작아서 안 보이면 크게 보기!'}</p>${zoom}`;
     }
     case 'imgpick':
-      return `<div class="pics">${v.imgs.map((src, i) => `<button class="opt pk${mark(i === key, u.pick === i)}" data-act="pick" data-v="${i}" aria-pressed="${u.pick === i}">${pic(src)}<span>${'AB'[i]}</span></button>`).join('')}</div>`;
+      return `${zoom}<div class="pics">${v.imgs.map((src, i) => `<button class="opt pk${mark(i === key, u.pick === i)}" data-act="pick" data-v="${i}" aria-pressed="${u.pick === i}">${pic(src)}<span>${'AB'[i]}</span></button>`).join('')}</div>`;
     case 'mc':
       return `<div class="opts">${p.opts.map((o, k) => `<button class="opt${mark(o === key, u.pick === o)}" data-act="pick" data-k="${k}" aria-pressed="${u.pick === o}"><span class="box round"></span>${esc(o)}</button>`).join('')}</div>`;
     case 'multi':
@@ -299,6 +300,16 @@ function countUp() {
 /* ---------- 팝업 ---------- */
 function modal(inner) { $layer.innerHTML = `<div class="modal" data-act="close"><div class="card stack" style="gap:12px">${inner}</div></div>`; }
 const H2 = t => `<strong style="font-family:var(--display);font-weight:400;font-size:26px">${t}</strong>`;
+/* 그림 크게 보기: 1배·2배·3배, 손가락으로 끌어서 움직여요 (보기만 하는 창이라 답은 원래 그림에서 골라요) */
+function showZoom() {
+  const p = P(); if (!p) return;
+  const srcs = p.view.imgs || [p.view.img];
+  modal(`${H2('그림 크게 보기')}<div class="zoomwrap">${srcs.map((src, i) => `<img src="${esc(src)}" alt="문제 그림 ${srcs.length > 1 ? 'AB'[i] : ''} 크게" draggable="false">`).join('')}</div>
+    <div class="zoomlv" role="group" aria-label="확대 배율">${[100, 200, 300].map(z => `<button data-act="zlv" data-v="${z}" aria-pressed="${z === 100}">${z / 100}배</button>`).join('')}</div>
+    <p class="note">2배·3배로 키운 뒤 손가락으로 끌어서 구석구석 봐요.${p.type === 'imgspot' ? ' 답은 창을 닫고 원래 그림에서 눌러요.' : ''}</p>
+    <button class="btn wide" data-act="close">닫기</button>`);
+  const card = $layer.querySelector('.modal .card'); if (card) card.classList.add('zoomcard');
+}
 function showTiers() {
   const mode = S.settings.tierMode, cur = S.B && S.B.me ? S.B.me.tier : -1;
   modal(`${H2('등급표 · ' + MODES[mode].label + ' 기준')}${tierGrid(mode, cur)}<p class="note">${MODES[mode].note}</p><div class="tchip" style="border-radius:16px;padding:4px 12px 4px 4px">${emblem(9, 48, true)}<span>힌트를 한 번도 안 쓰고 만점이면 <b>무결점</b> 월계관이 붙어요!</span></div><button class="btn wide" data-act="close">닫기</button>`);
@@ -466,6 +477,8 @@ function onAct(b, ev) {
     case 'review': showReview(); return;
     case 'achs': showAchs(); return;
     case 'close': $layer.innerHTML = ''; return;
+    case 'zoom': showZoom(); return;
+    case 'zlv': { const w = $layer.querySelector('.zoomwrap'); $layer.querySelectorAll('.zoomlv button').forEach(x => x.setAttribute('aria-pressed', String(x === b))); if (w) w.querySelectorAll('img').forEach(im => { im.style.width = v + '%'; }); return; }
     case 'other': store.del('quiz_session'); store.del('quiz_me'); S = { ...S, screen: 'start', items: [], token: null, me: null, B: null, err: '' }; render(); return;
   }
   if (S.screen !== 'quiz' || S.checked || S.busy) return;

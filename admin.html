@@ -70,6 +70,7 @@ tr.playing td { color: var(--sub); }
 .spotwrap { position: relative; display: inline-block; line-height: 0; border: 2px solid var(--ink); border-radius: 10px; overflow: hidden; cursor: crosshair; max-width: 100%; touch-action: none; }
 .spotwrap img { max-width: 100%; max-height: 300px; user-select: none; }
 .spotwrap .spotbox { position: absolute; }
+.spotwrap .spotbox.b2 { border-color: #F97316; background: rgba(249, 115, 22, .15); }
 .help2 { font-size: 13px; color: var(--sub); font-weight: 700; margin: 0; }
 .login { max-width: 420px; margin: auto; }
 </style>
@@ -294,7 +295,7 @@ function convertBody(b, t) {
   if (t === 'mc' || t === 'multi') { out.options = b.options || ['', '', '', '']; out.answer = 0; out.answers = [0]; }
   if (t === 'ox' || t === 'imgox') out.answer = 'O';
   if (t.startsWith('img')) { out.img = b.img || 'img/'; }
-  if (t === 'imgspot') out.spot = b.spot || [30, 30, 30, 30];
+  if (t === 'imgspot') { out.spot = b.spot || [30, 30, 30, 30]; if (b.spot2) out.spot2 = b.spot2; }
   if (t === 'imgpick') { out.imgs = b.imgs || ['img/', 'img/']; out.answer = 0; }
   if (t === 'sort') { out.buckets = b.buckets || ['', '']; out.items = b.items || []; }
   if (t === 'fill') { out.code = b.code || ''; out.chips = b.chips || []; out.answer = []; }
@@ -333,11 +334,14 @@ function typeFields(t, b) {
         <label class="f"><span>무리 ${k + 1}에 들어갈 항목 (한 줄에 하나)</span><textarea id="eIt${k}">${esc(items.filter(i => Number(i[1]) === k).map(i => i[0]).join('\n'))}</textarea></label></div>`).join('')}</div>`;
     }
     case 'imgspot': {
-      const sp = b.spot || [30, 30, 30, 30];
+      const sp = b.spot || [30, 30, 30, 30], has2 = Array.isArray(b.spot2) && b.spot2.length === 4, sp2 = has2 ? b.spot2 : [60, 60, 20, 20];
+      const nums = (cls, v) => `<div class="grid4">${['왼쪽 %', '위 %', '너비 %', '높이 %'].map((l, i) => `<label class="f"><span>${l}</span><input type="number" class="${cls}" data-i="${i}" value="${v[i]}" step="0.5"></label>`).join('')}</div>`;
       return `${imgField('eImg', b.img)}
-        <div class="f"><span>정답 영역: 아래 그림에서 끌어서 네모를 그려요</span>
-          <div><span class="spotwrap" id="eSpotWrap"><img id="eSpotImg" src="${esc(b.img || '')}" alt="정답 영역 그리기" draggable="false"><span class="spotbox" id="eSpotBox" style="left:${sp[0]}%;top:${sp[1]}%;width:${sp[2]}%;height:${sp[3]}%"></span></span></div>
-          <div class="grid4">${['왼쪽 %', '위 %', '너비 %', '높이 %'].map((l, i) => `<label class="f"><span>${l}</span><input type="number" class="eSp" data-i="${i}" value="${sp[i]}" step="0.5"></label>`).join('')}</div></div>
+        <div class="f"><span>정답 영역: 아래 그림에서 끌어서 네모를 그려요 (정답이 두 곳이면 영역 2도 켜요)</span>
+          <div class="bar"><label class="chk"><input type="radio" name="eSpTarget" value="1" checked> 영역 1 그리기</label><label class="chk"><input type="radio" name="eSpTarget" value="2"${has2 ? '' : ' disabled'}> 영역 2 그리기</label><label class="chk"><input type="checkbox" id="eSp2On"${has2 ? ' checked' : ''}> 정답 영역 2 쓰기</label></div>
+          <div><span class="spotwrap" id="eSpotWrap"><img id="eSpotImg" src="${esc(b.img || '')}" alt="정답 영역 그리기" draggable="false"><span class="spotbox" id="eSpotBox" style="left:${sp[0]}%;top:${sp[1]}%;width:${sp[2]}%;height:${sp[3]}%"></span><span class="spotbox b2" id="eSpotBox2" style="left:${sp2[0]}%;top:${sp2[1]}%;width:${sp2[2]}%;height:${sp2[3]}%"${has2 ? '' : ' hidden'}></span></span></div>
+          <strong style="font-size:14px">영역 1 (초록)</strong>${nums('eSp', sp)}
+          <div id="eSp2Nums"${has2 ? '' : ' hidden'}><strong style="font-size:14px">영역 2 (주황)</strong>${nums('eSp2', sp2)}</div></div>
         <label class="f"><span>정답 설명 (예: 휴대폰 화면 속 QR 코드)</span><input id="eSpotLabel" value="${esc(b.spotLabel || '')}"></label>`;
     }
     case 'imgpick': return `<div class="grid2">${imgField('eImgA', (b.imgs || [])[0], 'A 그림')}${imgField('eImgB', (b.imgs || [])[1], 'B 그림')}</div>
@@ -350,14 +354,18 @@ function imgField(id, v, label = '그림 주소') {
 }
 function bindSpot() {
   const wrap = document.getElementById('eSpotWrap'); if (!wrap) return;
-  const img = document.getElementById('eSpotImg'), box = document.getElementById('eSpotBox'), inp = [...document.querySelectorAll('.eSp')];
-  const setBox = sp => { box.style.left = sp[0] + '%'; box.style.top = sp[1] + '%'; box.style.width = sp[2] + '%'; box.style.height = sp[3] + '%'; inp.forEach((el, i) => { el.value = sp[i]; }); };
+  const img = document.getElementById('eSpotImg');
+  const area = k => ({ box: document.getElementById(k === 2 ? 'eSpotBox2' : 'eSpotBox'), inp: [...document.querySelectorAll(k === 2 ? '.eSp2' : '.eSp')] });
+  const setBox = (k, sp) => { const a = area(k); a.box.style.left = sp[0] + '%'; a.box.style.top = sp[1] + '%'; a.box.style.width = sp[2] + '%'; a.box.style.height = sp[3] + '%'; a.inp.forEach((el, i) => { el.value = sp[i]; }); };
+  const target = () => Number((document.querySelector('input[name="eSpTarget"]:checked') || {}).value || 1);
   const pt = e => { const r = img.getBoundingClientRect(); return [Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)), Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))]; };
   let start = null;
   wrap.onpointerdown = e => { start = pt(e); wrap.setPointerCapture(e.pointerId); };
-  wrap.onpointermove = e => { if (!start) return; const p = pt(e), r1 = v => Math.round(v * 2) / 2; setBox([r1(Math.min(start[0], p[0])), r1(Math.min(start[1], p[1])), r1(Math.abs(p[0] - start[0])), r1(Math.abs(p[1] - start[1]))]); };
+  wrap.onpointermove = e => { if (!start) return; const p = pt(e), r1 = v => Math.round(v * 2) / 2; setBox(target(), [r1(Math.min(start[0], p[0])), r1(Math.min(start[1], p[1])), r1(Math.abs(p[0] - start[0])), r1(Math.abs(p[1] - start[1]))]); };
   wrap.onpointerup = () => { start = null; };
-  inp.forEach(el => { el.oninput = () => setBox(inp.map(x => Number(x.value) || 0)); });
+  [1, 2].forEach(k => area(k).inp.forEach(el => { el.oninput = () => setBox(k, area(k).inp.map(x => Number(x.value) || 0)); }));
+  const on2 = document.getElementById('eSp2On'), r2 = document.querySelector('input[name="eSpTarget"][value="2"]');
+  on2.onchange = () => { const on = on2.checked; area(2).box.hidden = !on; document.getElementById('eSp2Nums').hidden = !on; r2.disabled = !on; if (!on && r2.checked) document.querySelector('input[name="eSpTarget"][value="1"]').checked = true; };
   document.getElementById('eImg').oninput = e => { img.src = e.target.value; };
 }
 /* 편집기 → 저장할 모양 */
@@ -382,7 +390,7 @@ function collect(loose, asType) {
     case 'match': b.pairs = lines(val('ePairs')).map(l => { const k = l.indexOf('=>'); return k < 0 ? [l.trim(), ''] : [l.slice(0, k).trim(), l.slice(k + 2).trim()]; }); if (chk('eCodeLeft')) b.code_left = true; break;
     case 'bug': b.lines = lines(val('eLines')); b.answer = Number(val('eLineNo')) - 1; if (chk('ePlain')) b.plain = true; break;
     case 'sort': b.buckets = [val('eBk0').trim(), val('eBk1').trim()]; b.items = [0, 1].flatMap(k => lines(val('eIt' + k)).map(x => [x.trim(), k])); break;
-    case 'imgspot': b.img = val('eImg').trim(); b.spot = [...document.querySelectorAll('.eSp')].map(x => Number(x.value) || 0); if (val('eSpotLabel').trim()) b.spotLabel = val('eSpotLabel').trim(); break;
+    case 'imgspot': b.img = val('eImg').trim(); b.spot = [...document.querySelectorAll('.eSp')].map(x => Number(x.value) || 0); if (chk('eSp2On')) b.spot2 = [...document.querySelectorAll('.eSp2')].map(x => Number(x.value) || 0); if (val('eSpotLabel').trim()) b.spotLabel = val('eSpotLabel').trim(); break;
     case 'imgpick': b.imgs = [val('eImgA').trim(), val('eImgB').trim()]; b.answer = Number((document.querySelector('input[name="ePick"]:checked') || {}).value || 0); break;
   }
   return { id: ED.id, area: val('eArea'), topic: val('eTopic').trim(), level: Number(val('eLevel')), type: t, active: chk('eActive'), body: b };
