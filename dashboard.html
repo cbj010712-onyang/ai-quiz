@@ -22,7 +22,8 @@ main.dash { max-width: 560px; }
 .panel .scroller { max-height: max(260px, calc(100svh - 470px)); }
 .cl-scroll { max-height: max(260px, calc(100svh - 470px)); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .qr-panel, .tv-only { display: none; }
-.back { text-align: center; }
+.back { display: block; text-align: center; text-decoration: none; }
+.homelink { align-self: flex-end; }
 .me-empty { font-size: 15px; font-weight: 700; color: var(--sub); }
 
 @media (min-width: 1000px) {
@@ -62,6 +63,7 @@ main.dash { max-width: 560px; }
       <h1><span class="blue">AI·코딩</span> 퀴즈 챌린지</h1>
     </div>
     <div class="stack" style="gap:6px;align-items:flex-end">
+      <a class="pill dashlink homelink" href="index.html" aria-label="퀴즈 시작 화면으로 돌아가기"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>퀴즈 화면</a>
       <span class="sub"><span class="ldot"></span><span id="upd">연결하는 중…</span></span>
     </div>
   </div>
@@ -101,7 +103,7 @@ main.dash { max-width: 560px; }
       <div class="pf-mini" id="pfMini"></div>
     </section>
   </div>
-  <p class="back"><a class="linkbtn" href="index.html">퀴즈 화면으로</a></p>
+  <a class="btn ghost wide back" href="index.html">퀴즈 화면으로 돌아가기</a>
 </main>
 <div id="layer"></div>
 
