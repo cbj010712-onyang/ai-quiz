@@ -121,7 +121,7 @@ function viewStart() {
   const st = S.settings, m = S.me || (store.get('quiz_session') || {}).me || store.get('quiz_me') || { grade: 1, cls: 1, num: '', name: '' };
   const maxC = g => (st.classes && st.classes[g]) || 12;
   const opt = (n, v, unit) => Array.from({ length: n }, (_, i) => `<option value="${i + 1}"${Number(v) === i + 1 ? ' selected' : ''}>${i + 1}${unit}</option>`).join('');
-  return `<span class="pill" style="margin-top:auto" data-act="secret">${esc(st.school)} 정보·AI 행사</span>
+  return `<div class="toprow" style="margin-top:auto"><span class="pill" data-act="secret">${esc(st.school)} 정보·AI 행사</span><a class="pill dashlink" href="${DASHBOARD_URL}" aria-label="도전하지 않고 순위 대시보드 보기"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V11M10 20V4M16 20v-7M21 20H3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>순위 보기</a></div>
     <div class="hero"><h1 style="font-size:clamp(40px, 12vw, 54px)"><span class="blue">AI·코딩</span><br>퀴즈 <span class="tag">챌린지</span></h1><img src="${TURTLE}" alt="휴대폰을 든 거북이 캐릭터"></div>
     ${st.isOpen ? '' : '<p class="err" role="alert" style="font-size:18px">지금은 퀴즈 시간이 아니에요. 선생님 안내를 기다려 주세요.</p>'}
     <div class="card stack" style="gap:10px">
