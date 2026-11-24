@@ -30,7 +30,7 @@ body { background: var(--ground); color: var(--ink); font-family: var(--body); f
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--ground); z-index: 10; }
 main { max-width: 540px; margin: 0 auto; min-height: 100svh; display: flex; flex-direction: column; gap: 12px; padding-block: 14px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: calc(max(16px, env(safe-area-inset-right, 0px)) + 5px); }   /* 카드 그림자(오른쪽 5px)만큼 오른쪽을 더 띄워서 양쪽이 같아 보이게 */
 button, select { font: inherit; color: inherit; cursor: pointer; }
-a.btn { color: var(--ink); cursor: pointer; }   /* 링크 버튼도 .btn 글꼴(Jua)을 그대로 써요 */
+a.btn { color: var(--ink); cursor: pointer; font-family: var(--round); }   /* 링크 버튼도 .btn 글꼴(Jua)을 그대로 써요 */
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--pick); outline-offset: 3px; }
 .card { background: var(--paper); border: 3px solid var(--ink); border-radius: 22px; box-shadow: 5px 5px 0 var(--ink); padding: 18px 16px; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
