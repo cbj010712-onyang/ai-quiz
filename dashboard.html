@@ -11,35 +11,76 @@
 <style>
 /* 휴대폰: 탭으로 하나씩 · 교실 TV(넓은 화면): 네 칸을 한 번에 */
 main.dash { max-width: 560px; }
-.dhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.dhead h1 { font-size: 30px; line-height: 1.1; }
-.dhead .sub { font-size: 13px; font-weight: 700; color: var(--sub); display: flex; align-items: center; gap: 6px; }
-.kpis.k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.kpis.k4 .v { font-size: 22px; }
+.dhead { display: flex; flex-direction: column; gap: 6px; }
+.dtop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.dtop #school { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dtitle { display: flex; align-items: flex-end; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; }
+.dhead h1 { font-size: clamp(25px, 8vw, 32px); line-height: 1.1; white-space: nowrap; }
+.dhead .sub { font-size: 12px; font-weight: 700; color: var(--sub); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.kpis.k4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.kpis.k4 .kpi { padding: 5px 6px 4px; text-align: center; min-width: 0; }
+.kpis.k4 .k { font-size: 12px; white-space: nowrap; }
+.kpis.k4 .v { font-size: clamp(18px, 6vw, 26px); white-space: nowrap; }
+.kpis.k4 .v small { font-size: .62em; margin-left: 1px; }
+.kl { display: none; }
+/* 목록 줄이 칸 높이에 눌려 겹치지 않게 (넘치면 스크롤) */
+.scroller > *, .cl-scroll > *, .pf-mini > *, .tlist > * { flex-shrink: 0; }
+.tabs button { white-space: nowrap; }
+/* 반별 순위 칸이 좁을 때(휴대폰, 작은 TV 화면): 막대를 아랫줄로 내려서 넓게 */
+@media (max-width: 480px), (min-width: 1000px) and (max-width: 1599px) {
+  .rk { grid-template-columns: 28px minmax(0, 1fr) auto !important; column-gap: 8px; row-gap: 3px; padding: 6px 4px; }
+  .rk .no { grid-row: 1 / span 3; align-self: center; }
+  .rk .lb { grid-column: 2; grid-row: 1; align-self: end; }
+  .rk .val { display: contents; }
+  .rk .val b { grid-column: 3; grid-row: 1; text-align: right; align-self: end; font-size: 19px; }
+  .rk .track { grid-column: 2 / -1; grid-row: 2; height: 12px; }
+  .rk .val small { grid-column: 2 / -1; grid-row: 3; text-align: left; }
+}
+@media (max-width: 480px) {
+  .cl-scroll { gap: 2px; }
+  .pf { grid-template-columns: 26px 54px minmax(0, 1fr) auto; gap: 6px; font-size: 15px; }
+  .pf .id { font-size: 13px; }
+  /* 칭호: 1줄 = 칭호 이름 + 주인, 2줄 = 설명 */
+  .tt { grid-template-columns: 36px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 0; align-items: baseline; }
+  .tt > svg { grid-row: 1 / span 2; align-self: center; }
+  .tt > div:not(.who) { display: contents; }
+  .tt .tn { grid-column: 2; grid-row: 1; }
+  .tt .who { grid-column: 3; grid-row: 1; font-size: 14px; }
+  .tt .td { grid-column: 2 / -1; grid-row: 2; }
+}
 .panel { display: none; }
 .panel.on { display: flex; }
 .panel h2 { display: none; margin: 0; font-family: var(--round); font-weight: 400; font-size: 24px; }
 .panel .scroller { max-height: max(260px, calc(100svh - 470px)); }
 .cl-scroll { max-height: max(260px, calc(100svh - 470px)); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
 .qr-panel, .tv-only { display: none; }
-.back { display: block; text-align: center; text-decoration: none; }
+.back { display: flex; text-decoration: none; }
 .homelink { align-self: flex-end; }
 .me-empty { font-size: 15px; font-weight: 700; color: var(--sub); }
 
 @media (min-width: 1000px) {
-  main.dash { max-width: none; height: 100svh; min-height: 0; padding: 20px 28px 24px; gap: 14px; }
+  main.dash { max-width: none; height: 100svh; min-height: 0; padding: 20px 33px 24px 28px; gap: 14px; }
+  .dhead { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "school home" "title sub"; align-items: end; gap: 4px 16px; }
+  .dhead .dtop, .dhead .dtitle { display: contents; }
+  #school { grid-area: school; justify-self: start; } .homelink { grid-area: home; justify-self: end; }
+  .dhead h1 { grid-area: title; } .dhead .sub { grid-area: sub; justify-self: end; }
   .dhead h1 { font-size: 44px; }
   .dhead .sub { font-size: 16px; }
+  .kl { display: inline; }
+  .kpis.k4 .kpi { text-align: left; }
   .me, .tabs, .back { display: none !important; }
-  .kpis.k4 { gap: 14px; }
-  .kpis.k4 .kpi { padding: 8px 18px; border-width: 3px; box-shadow: 4px 4px 0 var(--ink); }
+  /* 위 숫자 칸 4개와 아래 판 4개를 같은 칸 나누기로 맞춰요 (가장자리 줄이 위아래로 이어지게) */
+  main.dash { --cols: minmax(0, 1.35fr) minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 0.85fr); }
+  .kpis.k4 { grid-template-columns: var(--cols); gap: 16px; }
+  .kpis.k4 .kpi { padding: 8px 18px; border-width: 3px; border-radius: 22px; box-shadow: 5px 5px 0 var(--ink); }
   .kpis.k4 .k { font-size: 15px; }
   .kpis.k4 .v { font-size: 40px; }
-  .board { flex: 1; min-height: 0; display: grid; grid-template-columns: 1.35fr 1.1fr 1.2fr 0.85fr; grid-template-rows: minmax(0, 1fr); gap: 16px; }
+  .board { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--cols); grid-template-rows: minmax(0, 1fr); gap: 16px; }
   .ar.mine { position: static; }
   .panel, .panel.on { display: flex; min-height: 0; overflow: hidden; }
   .panel h2 { display: block; }
-  .panel .scroller, .cl-scroll { max-height: none; flex: 1; overflow: hidden; -webkit-mask-image: none; mask-image: none; }
+  .panel .scroller, .cl-scroll { max-height: none; flex: 1; min-height: 0; overflow-y: auto; -webkit-mask-image: none; mask-image: none; }
+  .scroller, .cl-scroll, .pf-mini { scrollbar-width: thin; scrollbar-color: var(--ink) transparent; }
   .qr-panel { display: flex; }
   .panel[data-panel="perfect"] { display: none !important; }
   .tv-only { display: block; }
@@ -49,7 +90,7 @@ main.dash { max-width: 560px; }
 }
 .qr-box { background: #FFFFFF; border: 3px solid var(--ink); border-radius: 16px; padding: 12px; line-height: 0; align-self: center; }
 .qr-box svg { width: 100%; height: auto; max-width: 260px; display: block; margin: 0 auto; }
-.pf-mini { display: flex; flex-direction: column; gap: 4px; overflow: hidden; flex: 1; min-height: 0; }
+.pf-mini { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; overscroll-behavior: contain; flex: 1; min-height: 0; padding-right: 2px; }
 .pf-mini .pf { grid-template-columns: 28px minmax(0, 1fr) auto; font-size: 15px; }
 .pf-mini .pf .id { display: none; }
 .pf-mini .pf > span:nth-child(3) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -58,21 +99,21 @@ main.dash { max-width: 560px; }
 <body>
 <main class="dash" id="app">
   <div class="dhead">
-    <div class="stack" style="gap:2px">
+    <div class="dtop">
       <span class="pill" id="school">퀴즈 대시보드</span>
-      <h1><span class="blue">AI·코딩</span> 퀴즈 챌린지</h1>
-    </div>
-    <div class="stack" style="gap:6px;align-items:flex-end">
       <a class="pill dashlink homelink" href="index.html" aria-label="퀴즈 시작 화면으로 돌아가기"><svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>퀴즈 화면</a>
+    </div>
+    <div class="dtitle">
+      <h1><span class="blue">AI·코딩</span> 퀴즈 챌린지</h1>
       <span class="sub"><span class="ldot"></span><span id="upd">연결하는 중…</span></span>
     </div>
   </div>
   <div class="card me" id="dMe" hidden></div>
   <div class="kpis k4" id="dKpi"></div>
   <div class="tabs" role="tablist">
-    <button role="tab" data-tab="all" aria-selected="true">전체 순위</button>
-    <button role="tab" data-tab="class" aria-selected="false">반별 순위</button>
-    <button role="tab" data-tab="perfect" aria-selected="false" id="tabPerfect">만점자</button>
+    <button role="tab" data-tab="all" aria-selected="true">전체</button>
+    <button role="tab" data-tab="class" aria-selected="false">반별</button>
+    <button role="tab" data-tab="perfect" aria-selected="false" id="tabPerfect">만점</button>
     <button role="tab" data-tab="titles" aria-selected="false">칭호</button>
   </div>
   <div class="board">
@@ -138,7 +179,7 @@ async function refresh() {
 
 function paint(animate) {
   const st = B.settings;
-  document.getElementById('school').textContent = st.school + ' · 실시간 대시보드';
+  document.getElementById('school').textContent = st.school + (wide() ? ' · 실시간 대시보드' : ' · 실시간');
   // 내 카드 (이 휴대폰으로 푼 학생만)
   const $me = document.getElementById('dMe');
   if (B.me) {
@@ -146,33 +187,34 @@ function paint(animate) {
     $me.hidden = false;
     $me.innerHTML = `${emblem(me.tier, 68, me.flawless)}
       <div class="stack" style="gap:2px;min-width:0;flex:1">
-        <span class="big${mv ? ' bump' : ''}">전체 ${me.rank}등 <small>/ ${B.n}명</small>${mv}</span>
+        <span class="big${mv ? ' bump' : ''}"><span class="nw">전체 ${me.rank}등</span> <small>/ ${B.n}명</small>${mv}</span>
         <span class="meline">${me.score}점 · <span class="${tch ? 'bump' : ''}" style="color:${t.c2}">${t.name}</span>${me.flawless ? ' <span class="flawmini">무결점</span>' : ''}</span>
         <span class="note">${fmtTime(me.time)} · 우리 반(${me.grade}-${me.cls}) ${B.myClass.rank}위</span>
       </div>`;
     document.getElementById('findMe').hidden = false;
   } else if (token) { $me.hidden = false; $me.innerHTML = '<span class="me-empty">퀴즈를 끝내면 여기에 내 순위가 나와요.</span>'; }
   // 숫자 칸
-  const kp = [['참가자', `${B.n}명`, ''], ['전체 평균', `${B.avg}점`, ''], ['만점자', `${B.perfect.length}명`, 'color:var(--coral)'], ['지금 푸는 중', `${B.playing}명`, 'color:var(--ai)']];
-  document.getElementById('dKpi').innerHTML = kp.map(([k, v, s], i) => `<div class="kpi"><div class="k">${k}</div><div class="v${animate && kpiOld[i] !== v ? ' bump' : ''}" style="${s}">${v}</div></div>`).join('');
-  kpiOld = kp.map(x => x[1]);
-  document.getElementById('tabPerfect').textContent = `만점자 ${B.perfect.length}`;
+  // [이름(휴대폰에선 앞 단어 숨김), 숫자, 단위, 색]
+  const kp = [['참가자', B.n, '명', ''], ['<span class="kl">전체 </span>평균', B.avg, '점', ''], ['만점자', B.perfect.length, '명', 'color:var(--coral)'], ['<span class="kl">지금 </span>푸는 중', B.playing, '명', 'color:var(--ai)']];
+  document.getElementById('dKpi').innerHTML = kp.map(([k, v, u, s], i) => `<div class="kpi"><div class="k">${k}</div><div class="v${animate && kpiOld[i] !== v + u ? ' bump' : ''}" style="${s}">${v}<small>${u}</small></div></div>`).join('');
+  kpiOld = kp.map(x => x[1] + x[2]);
+  document.getElementById('tabPerfect').textContent = `만점 ${B.perfect.length}`;
   document.getElementById('pfCount').textContent = `${B.perfect.length}명`;
 
   // 전체 순위
   const tv = wide();
-  const allRows = (tv ? B.rows.slice(0, 40) : B.rows).map(p => {
+  const allRows = B.rows.map(p => {   // TV도 전부 보여 주고 칸 안에서 스크롤해요
     const k = p.mine ? 'me' : p.sid;
-    return `<div class="ar${p.rank <= 3 ? ' r' + p.rank : ''}${p.mine ? ' mine' : ''}" data-key="a${k}"><span class="no">${p.rank}</span>${mini(p.tier, p.flawless)}<span class="who2"><span class="id">${p.sid}</span> ${esc(p.mine && B.me.fullName ? B.me.fullName : p.name)}${p.mine ? `<span class="chip mechip">나</span>${mover('ame', p.rank)}` : ''}</span><span class="sc"><b>${p.score}</b><small>${fmtTime(p.time)}</small></span></div>`;
+    return `<div class="ar${p.rank <= 3 ? ' r' + p.rank : ''}${p.mine ? ' mine' : ''}" data-key="a${k}"><span class="no${p.rank >= 100 ? ' n3' : ''}">${p.rank}</span>${mini(p.tier, p.flawless)}<span class="who2"><span class="id">${p.sid}</span> ${esc(p.mine && B.me.fullName ? B.me.fullName : p.name)}${p.mine ? `<span class="chip mechip">나</span>${mover('ame', p.rank)}` : ''}</span><span class="sc"><b>${p.score}</b><small>${fmtTime(p.time)}</small></span></div>`;
   }).join('') || '<p class="note">아직 참가자가 없어요. 첫 도전자가 되어 보세요!</p>';
   flip(document.getElementById('pAll'), allRows, animate);
   // 반별
   const max = B.classes.length ? B.classes[0].total : 1;
-  flip(document.getElementById('pClass'), B.classes.map(c => `<div class="rk${c.rank === 1 ? ' top1' : ''}${c.mine ? ' mine' : ''}" data-key="c${c.key}"><span class="no">${c.rank}</span><span class="lb">${c.grade}학년 ${c.cls}반${mover('c' + c.key, c.rank)}</span><div class="track"><span style="width:${c.total / max * 100}%"></span></div><span class="val"><b>${c.total.toLocaleString()}점</b><small>평균 ${c.avg} · ${c.n}명</small></span></div>`).join('') || '<p class="note">아직 기록이 없어요.</p>', animate);
+  flip(document.getElementById('pClass'), B.classes.map(c => `<div class="rk${c.rank === 1 ? ' top1' : ''}${c.mine ? ' mine' : ''}" data-key="c${c.key}"><span class="no${c.rank >= 100 ? ' n3' : ''}">${c.rank}</span><span class="lb">${c.grade}학년 ${c.cls}반${mover('c' + c.key, c.rank)}</span><div class="track"><span style="width:${c.total / max * 100}%"></span></div><span class="val"><b>${c.total.toLocaleString()}점</b><small>평균 ${c.avg} · ${c.n}명</small></span></div>`).join('') || '<p class="note">아직 기록이 없어요.</p>', animate);
   // 만점자
-  const pf = B.perfect.map((p, i) => { const k = p.mine ? 'me' : p.sid; return `<div class="pf${i === 0 ? ' top1' : ''}${p.mine ? ' mine' : ''}" data-key="p${k}"><span class="no">${i + 1}</span><span class="id">${p.sid}</span><span>${esc(p.name)}${p.mine ? ' <span class="chip mechip">나</span>' : ''}${p.flawless ? ' <span class="flawmini">무결점</span>' : ''}${mover('p' + k, i + 1)}</span><span class="tm">${fmtTime(p.time)}</span></div>`; });
+  const pf = B.perfect.map((p, i) => { const k = p.mine ? 'me' : p.sid; return `<div class="pf${i === 0 ? ' top1' : ''}${p.mine ? ' mine' : ''}" data-key="p${k}"><span class="no${i >= 99 ? ' n3' : ''}">${i + 1}</span><span class="id">${p.sid}</span><span>${esc(p.name)}${p.mine ? ' <span class="chip mechip">나</span>' : ''}${p.flawless ? ' <span class="flawmini">무결점</span>' : ''}${mover('p' + k, i + 1)}</span><span class="tm">${fmtTime(p.time)}</span></div>`; });
   flip(document.getElementById('pPerfect'), pf.join('') || '<p class="note">아직 만점자가 없어요.</p>', animate);
-  flip(document.getElementById('pfMini'), pf.slice(0, 12).join('') || '<p class="note">첫 만점자를 기다려요!</p>', animate);
+  flip(document.getElementById('pfMini'), pf.join('') || '<p class="note">첫 만점자를 기다려요!</p>', animate);
   // 칭호
   flip(document.getElementById('pTitles'), B.titles.map(x => {
     const h = x.holder, hk = h ? h.sid : '';
@@ -184,7 +226,10 @@ function paint(animate) {
 }
 function findMe() {
   const box = document.getElementById('pAll'), el = box.querySelector('[data-key="ame"]');
-  if (el) box.scrollTo({ top: Math.max(0, el.offsetTop - box.offsetTop - box.clientHeight / 2 + el.offsetHeight / 2), behavior: REDUCED ? 'auto' : 'smooth' });
+  if (!el) return;
+  // 내 줄은 화면에 붙어 다니는(sticky) 줄이라 지금 보이는 위치가 아니라 '원래 자리'를 계산해요: 바로 앞 줄의 아래쪽
+  const prev = el.previousElementSibling, y = prev ? prev.offsetTop + prev.offsetHeight : 0;
+  box.scrollTo({ top: Math.max(0, y - box.clientHeight / 2 + el.offsetHeight / 2), behavior: REDUCED ? 'auto' : 'smooth' });
 }
 document.querySelector('.tabs').addEventListener('click', e => {
   const b = e.target.closest('[data-tab]'); if (!b) return;
