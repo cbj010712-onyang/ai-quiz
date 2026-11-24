@@ -37,7 +37,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .pill { align-self: flex-start; font-size: 14px; font-weight: 700; color: var(--sub); background: var(--paper); border: 2px solid var(--ink); border-radius: 999px; padding: 2px 12px; }
 h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: clamp(44px, 13vw, 60px); line-height: 1.05; text-wrap: balance; }
 h1 .blue, .blue { color: var(--ai); }
-h1 .tag { display: inline-block; background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 0 10px 4px; box-shadow: 4px 4px 0 var(--ink); transform: rotate(-2deg); margin-top: 4px; }
+h1 .tag { display: inline-block; background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; line-height: .85; padding: .27em .19em .07em .2em; /* Black Han Sans는 글자가 위로 붙어 그려져서 위 여백을 더 줘요 */ box-shadow: 4px 4px 0 var(--ink); transform: rotate(-2deg); margin-top: 4px; }
 .hero { display: flex; align-items: flex-end; gap: 8px; }
 .hero h1 { flex: 1; min-width: 0; }
 .hero img { flex: none; width: 34%; max-width: 160px; height: auto; margin-bottom: -6px; }
@@ -336,3 +336,7 @@ body.kb .demo-ribbon { display: none; }
 .zoomlv { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .zoomlv button { font-family: var(--round); font-size: 18px; padding: 8px 0; border: 2.5px solid var(--ink); border-radius: 12px; background: #FFFFFF; color: var(--ink); cursor: pointer; }
 .zoomlv button[aria-pressed="true"] { background: var(--pick); color: #FFFFFF; }
+
+/* 시작 화면: 도전 없이 대시보드로 */
+.toprow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.pill.dashlink { display: inline-flex; align-items: center; gap: 5px; color: #FFFFFF; background: var(--ai); text-decoration: none; box-shadow: 3px 3px 0 var(--ink); white-space: nowrap; }
