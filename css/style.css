@@ -28,8 +28,9 @@ img { max-width: 100%; }
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { background: var(--ground); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.55; word-break: keep-all; -webkit-tap-highlight-color: transparent; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--ground); z-index: 10; }
-main { max-width: 540px; margin: 0 auto; min-height: 100svh; display: flex; flex-direction: column; gap: 12px; padding-block: 14px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-button, a.btn, select { font: inherit; color: inherit; cursor: pointer; }
+main { max-width: 540px; margin: 0 auto; min-height: 100svh; display: flex; flex-direction: column; gap: 12px; padding-block: 14px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: calc(max(16px, env(safe-area-inset-right, 0px)) + 5px); }   /* 카드 그림자(오른쪽 5px)만큼 오른쪽을 더 띄워서 양쪽이 같아 보이게 */
+button, select { font: inherit; color: inherit; cursor: pointer; }
+a.btn { color: var(--ink); cursor: pointer; }   /* 링크 버튼도 .btn 글꼴(Jua)을 그대로 써요 */
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--pick); outline-offset: 3px; }
 .card { background: var(--paper); border: 3px solid var(--ink); border-radius: 22px; box-shadow: 5px 5px 0 var(--ink); padding: 18px 16px; }
 .stack { display: flex; flex-direction: column; gap: 14px; }
@@ -98,7 +99,8 @@ h1 .tag { display: inline-block; background: var(--paper); border: 3px solid var
 .achs-h { display: flex; align-items: baseline; gap: 6px; font-size: 15px; font-weight: 700; }
 .achs-h b { font-family: var(--round); font-weight: 400; font-size: 18px; }
 .achs-h .more { margin-left: auto; font-size: 12px; color: var(--ai); text-decoration: underline; }
-.achs-row { display: flex; justify-content: space-between; gap: 2px; }
+.achs-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 2px; }
+@media (max-width: 360px) { .achs-row { justify-content: center; } .achs-row svg { width: 26px; height: 26px; } .st { font-size: 13px; padding: 4px 5px; } .st b { font-size: 15px; } .tierbox .tsub { font-size: 16px; } }
 .ach { line-height: 0; animation: pop .4s ease-out backwards; }
 .ach.off svg { filter: grayscale(1); opacity: .3; }
 .achrow { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 8px; border-radius: 12px; border: 2px solid transparent; }
@@ -107,7 +109,8 @@ h1 .tag { display: inline-block; background: var(--paper); border: 3px solid var
 .achrow .ok { font-size: 13px; font-weight: 900; color: var(--sub); }
 .achrow.got .ok { color: var(--ok); }
 .meline { font-weight: 700; font-size: 17px; }
-.me .big { font-size: 30px; white-space: nowrap; }
+.me .big { font-size: clamp(22px, 7.2vw, 30px); }
+.me .big .nw, .me .big small, .me .big .mv { white-space: nowrap; }   /* '전체 N등'은 붙여 두고, 넘치면 '/ N명'만 다음 줄로 */
 .me .big .mv { font-size: 13px; }
 .tlist.scroller, .plist.scroller { -webkit-mask-image: linear-gradient(#000 82%, transparent); mask-image: linear-gradient(#000 82%, transparent); padding-bottom: 28px; }
 .scroller { max-height: max(220px, calc(100svh - 512px)); overflow-y: auto; overscroll-behavior: contain; position: relative; display: flex; flex-direction: column; gap: 4px; padding-right: 2px; }
@@ -282,6 +285,7 @@ input.answer { width: 100%; font: 700 24px var(--mono); padding: 12px 16px; bord
 .tabs button + button { border-left: 3px solid var(--ink); }
 .tabs button[aria-selected="true"] { background: var(--sun); }
 .rk { display: grid; grid-template-columns: 30px 104px minmax(0, 1fr) 86px; gap: 8px; align-items: center; font-size: 16px; font-weight: 700; min-height: 36px; }
+.no.n3 { font-size: 11px; letter-spacing: -.5px; }
 .no { width: 28px; height: 28px; border: 2px solid var(--ink); border-radius: 50%; display: grid; place-items: center; font-family: var(--display); font-weight: 400; font-size: 15px; background: var(--paper); }
 .rk .track { height: 16px; border: 2px solid var(--ink); border-radius: 999px; background: var(--cream); overflow: hidden; }
 .rk .track span { display: block; height: 100%; background: #7DD3FC; }
@@ -289,6 +293,8 @@ input.answer { width: 100%; font: 700 24px var(--mono); padding: 12px 16px; bord
 .rk .val b { font-family: var(--display); font-weight: 400; font-size: 17px; }
 .rk .val small { display: block; font-size: 11px; color: var(--sub); }
 .rk.mine, .pf.mine { background: var(--cream); border-radius: 10px; outline: 2px solid var(--ink); }
+/* '나'·'우리 반' 줄 테두리를 안쪽에 그려서, 스크롤 칸 가장자리에서 잘리지 않게 */
+.ar.mine, .rk.mine, .pf.mine, .tt.mine { outline-offset: -2px; }
 .top1 .no, .rk.top1 .track span { background: var(--sun); }
 .pf { display: grid; grid-template-columns: 30px 62px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 16px; font-weight: 700; min-height: 40px; padding: 0 4px; }
 .pf .id { font-family: var(--mono); font-size: 15px; color: var(--sub); }
