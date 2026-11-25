@@ -6,6 +6,6 @@
    ※ 둘 다 비워 두면 '체험 모드'(예시 데이터)로 돌아가요.
    ===================================================================== */
 window.QUIZ_CONFIG = {
-  url: '',
-  key: '',
+  url: 'https://alzriwpscgffbobiefjf.supabase.co',
+  key: 'sb_publishable_P6ZvISkSuRh45NTTyt4ZqA_bjNMxpfs',
 };
