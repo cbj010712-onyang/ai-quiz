@@ -246,7 +246,7 @@
         settings: settingsJson(),
         questions: db.questions.map(q => { const u = its.filter(i => i.qid === q.id && i.answered); return { ...clone(q), used: its.filter(i => i.qid === q.id).length, rate: u.length ? Math.round(u.filter(i => i.correct).length * 100 / u.length) : null }; }),
         attempts: db.attempts.slice().sort((x, y) => (!!x.finished === !!y.finished ? (y.score ?? -1) - (x.score ?? -1) || (x.time ?? 0) - (y.time ?? 0) : x.finished ? -1 : 1))
-          .map(a => ({ id: a.id, grade: a.grade, cls: a.cls, num: a.num, name: a.name, started: new Date(a.started).toISOString(), finished: a.finished ? new Date(a.finished).toISOString() : null, score: a.score ?? null, right: a.right ?? null, total: a.total ?? a.items.length, time: a.time ?? null, hints: a.hints ?? null, combo: a.combo ?? null, flawless: a.flawless ?? null, answered: a.items.filter(i => i.answered).length, items: a.items.length })),
+          .map(a => ({ id: a.id, grade: a.grade, cls: a.cls, num: a.num, name: a.name, started: new Date(a.started).toISOString(), finished: a.finished ? new Date(a.finished).toISOString() : null, score: a.score ?? null, right: a.right ?? null, total: a.total ?? a.items.length, time: a.time ?? null, hints: a.hints ?? null, combo: a.combo ?? null, flawless: a.flawless ?? null, snack: !!a.snack, snackAt: a.snackAt || null, answered: a.items.filter(i => i.answered).length, items: a.items.length })),
       };
     },
     admin_attempt({ p_pw, p_id }) {
@@ -275,6 +275,8 @@
     },
     admin_set_active({ p_pw, p_id, p_active }) { admin(p_pw); const q = db.questions.find(x => x.id === p_id); if (q) q.active = !!p_active; save(); return { ok: true }; },
     admin_delete_question({ p_pw, p_id }) { admin(p_pw); db.questions = db.questions.filter(x => x.id !== p_id); save(); return { ok: true }; },
+    admin_delete_attempts({ p_pw, p_ids }) { admin(p_pw); const ids = new Set(p_ids || []), n = db.attempts.filter(x => ids.has(x.id)).length; db.attempts = db.attempts.filter(x => !ids.has(x.id)); save(); return { ok: true, deleted: n }; },
+    admin_set_snack({ p_pw, p_ids, p_on }) { admin(p_pw); const ids = new Set(p_ids || []), at = p_on ? new Date().toISOString() : null; let n = 0; db.attempts.forEach(x => { if (ids.has(x.id)) { x.snack = !!p_on; x.snackAt = at; n++; } }); save(); return { ok: true, changed: n, at }; },
     admin_delete_attempt({ p_pw, p_id }) { admin(p_pw); db.attempts = db.attempts.filter(x => x.id !== p_id); save(); return { ok: true }; },
     admin_reset({ p_pw, p_confirm, p_grade = null, p_cls = null }) {
       admin(p_pw);

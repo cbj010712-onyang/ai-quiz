@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261124b">
+<link rel="stylesheet" href="css/style.css?v=20261125a">
 <style>
 main.adm { max-width: 1120px; gap: 14px; }
 .ahead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
@@ -40,6 +40,18 @@ td.num { font-variant-numeric: tabular-nums; text-align: right; }
 tr.playing td { color: var(--sub); }
 .tag2 { display: inline-block; font-size: 12px; font-weight: 900; border-radius: 999px; padding: 0 8px; border: 1.5px solid var(--ink); }
 .tag2.done { background: var(--ok-bg); } .tag2.play { background: var(--pick-bg); }
+/* 간식 · 체크 */
+th.ck, td.ck { width: 34px; text-align: center; padding-left: 6px; padding-right: 6px; }
+td.ck input, th.ck input { width: 20px; height: 20px; accent-color: var(--ai); cursor: pointer; }
+button.snack { font-family: var(--round); font-size: 14px; white-space: nowrap; min-width: 64px; padding: 3px 10px; border: 2px solid var(--ink); border-radius: 999px; background: var(--paper); color: var(--sub); cursor: pointer; }
+button.snack.on { background: var(--ok-bg); color: var(--ok); border-color: var(--ok); font-weight: 700; }
+tr.picked td { background: #E0ECFF; }
+td.nm { white-space: nowrap; }
+@media (max-width: 560px) { .selbar .mini-btn { font-size: 14px; padding: 4px 10px; } }
+.selbar { position: sticky; top: 0; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--sun); border: 3px solid var(--ink); border-radius: 14px; padding: 8px 12px; box-shadow: 3px 3px 0 var(--ink); }
+.snacksum { background: var(--ok-bg) !important; }
+.delnames { display: flex; flex-wrap: wrap; gap: 4px 6px; max-height: 30svh; overflow-y: auto; }
+.delnames span { font-size: 13px; font-weight: 700; background: var(--cream); border: 1.5px solid var(--ink); border-radius: 8px; padding: 1px 8px; }
 .qrow { display: grid; grid-template-columns: 46px 88px 64px 92px minmax(0, 1fr) 110px 70px 70px; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid #EDE6C8; font-size: 15px; }
 .qrow.off { opacity: .5; }
 .qrow .qt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
@@ -79,10 +91,10 @@ tr.playing td { color: var(--sub); }
 <main class="adm" id="app"><p class="loading">불러오는 중…</p></main>
 <div id="layer"></div>
 
-<script src="js/qrcode.js?v=20261124b"></script>
-<script src="config.js?v=20261124b"></script>
-<script src="js/common.js?v=20261124b"></script>
-<script src="js/mock.js?v=20261124b"></script>
+<script src="js/qrcode.js?v=20261125a"></script>
+<script src="config.js?v=20261125a"></script>
+<script src="js/common.js?v=20261125a"></script>
+<script src="js/mock.js?v=20261125a"></script>
 <script>
 /* =====================================================================
    관리자 페이지 (비밀번호가 있어야 열려요)
@@ -95,7 +107,8 @@ const ss = { get(k) { try { return sessionStorage.getItem(k); } catch (e) { retu
 const ls = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }, del(k) { try { localStorage.removeItem(k); } catch (e) {} } };
 const forgetPw = () => { ss.del('quiz_admin_pw'); ls.del('quiz_admin_pw'); PW = null; };
 let PW = ss.get('quiz_admin_pw') || ls.get('quiz_admin_pw'), D = null, tab = 'people', sortKey = 'rank', sortDir = 1;
-const F = { q: '', grade: '', cls: '', status: '', area: '', type: '', qs: '' };
+const F = { q: '', grade: '', cls: '', status: '', snack: '', area: '', type: '', qs: '' };
+const SEL = new Set();   // 참가 기록에서 체크한 학생(기록 id)
 const TYPES = ['ox', 'mc', 'multi', 'input', 'fill', 'order', 'match', 'bug', 'sort', 'imgox', 'imgspot', 'imgpick'];
 const TYPE_HELP = {
   ox: 'O/X 하나 고르기', mc: '보기 중 하나 고르기', multi: '정답 보기 여러 개 고르기', input: '답을 직접 적기', fill: '코드·문장의 빈칸에 블록 넣기',
@@ -159,42 +172,56 @@ function peopleRows(all) {
   const q = F.q.trim();
   let list = D.attempts.map((a, i) => ({ ...a, sid: sidOf(a.grade, a.cls, a.num), status: a.finished ? 'done' : 'play' }));
   let r = 0; list.filter(a => a.finished).sort((x, y) => y.score - x.score || x.time - y.time || new Date(x.finished) - new Date(y.finished)).forEach(a => { a.rank = ++r; });
-  if (!all) list = list.filter(a => (!F.grade || a.grade == F.grade) && (!F.cls || a.cls == F.cls) && (!F.status || a.status === F.status) && (!q || a.name.includes(q) || a.sid.includes(q)));
-  const val = a => ({ rank: a.rank ?? 1e9, sid: a.sid, name: a.name, score: a.score ?? -1, time: a.time ?? 1e9, hints: a.hints ?? 99, started: a.started })[sortKey];
+  if (!all) list = list.filter(a => (!F.grade || a.grade == F.grade) && (!F.cls || a.cls == F.cls) && (!F.status || a.status === F.status) && (!F.snack || (F.snack === 'yes') === !!a.snack) && (!q || a.name.includes(q) || a.sid.includes(q)));
+  const val = a => ({ rank: a.rank ?? 1e9, sid: a.sid, name: a.name, score: a.score ?? -1, time: a.time ?? 1e9, hints: a.hints ?? 99, started: a.started, snack: a.snack ? 1 : 0 })[sortKey];
   return list.sort((x, y) => (val(x) > val(y) ? 1 : val(x) < val(y) ? -1 : 0) * sortDir);
 }
 function viewPeople() {
   const all = D.attempts, done = all.filter(a => a.finished), avg = done.length ? Math.round(done.reduce((s, a) => s + a.score, 0) / done.length * 10) / 10 : 0;
-  const rows = peopleRows();
+  [...SEL].forEach(id => { if (!all.some(a => a.id === id)) SEL.delete(id); });   // 지워진 기록은 체크에서 빼요
+  const rows = peopleRows(), snackN = all.filter(a => a.snack).length;
+  const allOn = rows.length > 0 && rows.every(a => SEL.has(a.id));
   const th = (k, l) => `<th data-act="sort" data-v="${k}">${l}${sortKey === k ? (sortDir > 0 ? ' ▲' : ' ▼') : ''}</th>`;
   document.getElementById('body').innerHTML = `
-    <div class="sum"><span>완료 ${done.length}명</span><span>푸는 중 ${all.length - done.length}명</span><span>평균 ${avg}점</span><span>만점 ${done.filter(a => a.score === 100).length}명</span><span>무결점 ${done.filter(a => a.flawless).length}명</span></div>
+    <div class="sum"><span>완료 ${done.length}명</span><span>푸는 중 ${all.length - done.length}명</span><span>평균 ${avg}점</span><span>만점 ${done.filter(a => a.score === 100).length}명</span><span>무결점 ${done.filter(a => a.flawless).length}명</span><span class="snacksum">간식 지급 ${snackN} / ${all.length}명</span></div>
     <div class="bar">
       <input type="search" id="fq" placeholder="이름 또는 학번 찾기" value="${esc(F.q)}">
       <select id="fgrade"><option value="">전체 학년</option>${[1, 2, 3].map(g => `<option value="${g}"${F.grade == g ? ' selected' : ''}>${g}학년</option>`).join('')}</select>
       <select id="fcls"><option value="">전체 반</option>${Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}"${F.cls == i + 1 ? ' selected' : ''}>${i + 1}반</option>`).join('')}</select>
       <select id="fstatus"><option value="">전체 상태</option><option value="done"${F.status === 'done' ? ' selected' : ''}>완료</option><option value="play"${F.status === 'play' ? ' selected' : ''}>푸는 중</option></select>
+      <select id="fsnack"><option value="">간식 전체</option><option value="no"${F.snack === 'no' ? ' selected' : ''}>간식 아직</option><option value="yes"${F.snack === 'yes' ? ' selected' : ''}>간식 지급함</option></select>
       <button class="mini-btn yellow" data-act="csv">CSV 내려받기</button>
     </div>
+    <div class="selbar"${SEL.size ? '' : ' hidden'}>
+      <b>${SEL.size}명 체크함</b>
+      <button class="mini-btn green" data-act="snackSel" data-v="1">간식 지급</button>
+      <button class="mini-btn" data-act="snackSel" data-v="0">간식 취소</button>
+      <button class="mini-btn red" data-act="askDelSel">체크한 학생 기록 지우기</button>
+      <button class="mini-btn" data-act="selNone">체크 풀기</button>
+    </div>
     <div class="tblwrap"><table>
-      <thead><tr>${th('rank', '순위')}${th('sid', '학번')}${th('name', '이름')}${th('score', '점수')}<th>맞힘</th>${th('time', '시간')}${th('hints', '힌트')}<th>콤보</th><th>무결점</th><th>상태</th>${th('started', '시작')}<th></th></tr></thead>
-      <tbody>${rows.map(a => `<tr class="${a.finished ? '' : 'playing'}">
-        <td class="num">${a.rank ?? '-'}</td><td>${a.sid}</td><td><b>${esc(a.name)}</b></td>
+      <thead><tr><th class="ck"><input type="checkbox" id="selAll" aria-label="보이는 학생 모두 체크"${allOn ? ' checked' : ''}></th>${th('snack', '간식')}${th('sid', '학번')}${th('name', '이름')}${th('rank', '순위')}${th('score', '점수')}<th>맞힘</th>${th('time', '시간')}${th('hints', '힌트')}<th>콤보</th><th>무결점</th><th>상태</th>${th('started', '시작')}<th></th></tr></thead>
+      <tbody>${rows.map(a => `<tr class="${a.finished ? '' : 'playing'}${SEL.has(a.id) ? ' picked' : ''}">
+        <td class="ck"><input type="checkbox" class="selbox" data-id="${a.id}" aria-label="${esc(a.name)} 체크"${SEL.has(a.id) ? ' checked' : ''}></td>
+        <td><button class="snack${a.snack ? ' on' : ''}" data-act="snack" data-id="${a.id}" aria-pressed="${!!a.snack}" title="${a.snack ? '지급 ' + fmtDT(a.snackAt) + ' · 누르면 취소' : '누르면 지급으로 바뀌어요'}">${a.snack ? '✓ 지급' : '미지급'}</button></td>
+        <td>${a.sid}</td><td class="nm"><b>${esc(a.name)}</b></td><td class="num">${a.rank ?? '-'}</td>
         <td class="num">${a.score ?? '-'}</td><td class="num">${a.finished ? `${a.right}/${a.total}` : `${a.answered}/${a.items}`}</td>
         <td class="num">${a.time != null ? fmtTime(a.time) : '-'}</td><td class="num">${a.hints ?? '-'}</td><td class="num">${a.combo ?? '-'}</td>
         <td>${a.flawless ? '<span class="flawmini">무결점</span>' : ''}</td>
         <td><span class="tag2 ${a.status}">${a.finished ? '완료' : '푸는 중'}</span></td><td>${fmtDT(a.started)}</td>
         <td><button class="mini-btn" data-act="detail" data-id="${a.id}">답 보기</button> <button class="mini-btn red" data-act="delAttempt" data-id="${a.id}">지우기</button></td>
-      </tr>`).join('') || '<tr><td colspan="12" class="note">아직 기록이 없어요.</td></tr>'}</tbody>
+      </tr>`).join('') || '<tr><td colspan="14" class="note">아직 기록이 없어요.</td></tr>'}</tbody>
     </table></div>
-    <p class="help2">'지우기'를 하면 그 학생이 처음부터 다시 도전할 수 있어요. 대시보드에는 이름 가운데가 가려져서 나와요.</p>`;
+    <p class="help2"><b>간식</b> 칸을 누르면 지급 ↔ 미지급이 바로 바뀌어요. 왼쪽 네모로 여러 학생을 체크해서 한 번에 간식 지급·취소하거나 기록을 지울 수 있어요. '지우기'를 하면 그 학생이 처음부터 다시 도전할 수 있어요. 대시보드에는 이름 가운데가 가려져서 나와요.</p>`;
   const rerender = () => { const y = scrollY; viewPeople(); scrollTo(0, y); };
   document.getElementById('fq').oninput = e => { F.q = e.target.value; clearTimeout(window._ft); window._ft = setTimeout(() => { rerender(); const el = document.getElementById('fq'); el.focus(); el.setSelectionRange(el.value.length, el.value.length); }, 250); };
-  ['grade', 'cls', 'status'].forEach(k => { document.getElementById('f' + k).onchange = e => { F[k] = e.target.value; rerender(); }; });
+  ['grade', 'cls', 'status', 'snack'].forEach(k => { document.getElementById('f' + k).onchange = e => { F[k] = e.target.value; rerender(); }; });
+  document.getElementById('selAll').onchange = e => { rows.forEach(a => e.target.checked ? SEL.add(a.id) : SEL.delete(a.id)); rerender(); };
+  document.querySelectorAll('.selbox').forEach(el => { el.onchange = () => { const id = Number(el.dataset.id); el.checked ? SEL.add(id) : SEL.delete(id); rerender(); }; });
 }
 function csv(all) {
-  const head = ['순위', '학번', '학년', '반', '번호', '이름', '점수', '맞힌수', '문제수', '걸린시간(초)', '힌트', '최고콤보', '무결점', '상태', '시작', '완료'];
-  const lines = peopleRows(all).map(a => [a.rank ?? '', a.sid, a.grade, a.cls, a.num, a.name, a.score ?? '', a.right ?? '', a.total ?? '', a.time ?? '', a.hints ?? '', a.combo ?? '', a.flawless ? 'O' : '', a.finished ? '완료' : '푸는 중', a.started || '', a.finished || '']);
+  const head = ['순위', '학번', '학년', '반', '번호', '이름', '점수', '맞힌수', '문제수', '걸린시간(초)', '힌트', '최고콤보', '무결점', '상태', '시작', '완료', '간식지급', '간식지급시각'];
+  const lines = peopleRows(all).map(a => [a.rank ?? '', a.sid, a.grade, a.cls, a.num, a.name, a.score ?? '', a.right ?? '', a.total ?? '', a.time ?? '', a.hints ?? '', a.combo ?? '', a.flawless ? 'O' : '', a.finished ? '완료' : '푸는 중', a.started || '', a.finished || '', a.snack ? 'O' : '', a.snackAt || '']);
   const text = '﻿' + [head, ...lines].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const blob = new Blob([text], { type: 'text/csv;charset=utf-8' }), name = `퀴즈기록_${new Date().toISOString().slice(0, 10)}.csv`;
   const save = async () => {
@@ -510,6 +537,35 @@ document.addEventListener('click', async e => {
       case 'toggleOpen': await rpc('admin_save_settings', { p_pw: PW, p: { isOpen: !D.settings.isOpen } }); await load(); toast(D.settings.isOpen ? '퀴즈를 열었어요' : '퀴즈를 닫았어요'); break;
       case 'sort': if (sortKey === b.dataset.v) sortDir = -sortDir; else { sortKey = b.dataset.v; sortDir = 1; } viewPeople(); break;
       case 'csv': csv(); break;
+      case 'snack': {   // 한 명: 누를 때마다 지급 ↔ 미지급
+        const a = D.attempts.find(x => x.id === id); if (!a) break;
+        b.disabled = true;
+        const r = await rpc('admin_set_snack', { p_pw: PW, p_ids: [id], p_on: !a.snack });
+        a.snack = !a.snack; a.snackAt = a.snack ? (r.at || new Date().toISOString()) : null;
+        const y = scrollY; viewPeople(); scrollTo(0, y); toast(`${a.name} · ${a.snack ? '간식 지급' : '간식 취소'}`); break;
+      }
+      case 'snackSel': {   // 체크한 학생 여러 명
+        const ids = [...SEL], on = b.dataset.v === '1'; if (!ids.length) break;
+        b.classList.add('busy');
+        const r = await rpc('admin_set_snack', { p_pw: PW, p_ids: ids, p_on: on });
+        D.attempts.forEach(a => { if (SEL.has(a.id)) { a.snack = on; a.snackAt = on ? (r.at || new Date().toISOString()) : null; } });
+        const y = scrollY; viewPeople(); scrollTo(0, y); toast(`${ids.length}명 ${on ? '간식 지급' : '간식 취소'}`); break;
+      }
+      case 'selNone': SEL.clear(); { const y = scrollY; viewPeople(); scrollTo(0, y); } break;
+      case 'askDelSel': {
+        const picked = D.attempts.filter(a => SEL.has(a.id)); if (!picked.length) break;
+        modal(`<strong class="ftitle" style="color:var(--bad)">체크한 학생 기록 지우기</strong>
+          <div class="rs-count"><b>체크한 학생</b> <b class="big">${picked.length}명</b></div>
+          <div class="delnames">${picked.slice(0, 30).map(a => `<span>${sidOf(a.grade, a.cls, a.num)} ${esc(a.name)}</span>`).join('')}${picked.length > 30 ? `<span>외 ${picked.length - 30}명</span>` : ''}</div>
+          <p class="help2">이 학생들의 점수·답·간식 체크가 지워지고, 처음부터 다시 도전할 수 있어요. 대시보드 순위와 칭호도 다시 계산돼요. 지운 기록은 되돌릴 수 없어요.</p>
+          <div class="btn-row"><button class="btn ghost" data-act="close">그만두기</button><button class="btn" style="background:var(--coral);color:#fff" data-act="doDelSel">${picked.length}명 지우기</button></div>`);
+        break;
+      }
+      case 'doDelSel': {
+        b.classList.add('busy'); b.disabled = true;
+        const r = await rpc('admin_delete_attempts', { p_pw: PW, p_ids: [...SEL] });
+        SEL.clear(); closeModal(); toast(`기록 ${r.deleted}명을 지웠어요`); await load(); break;
+      }
       case 'detail': showDetail(id); break;
       case 'delAttempt': askDelAttempt(id); break;
       case 'doDelAttempt': await rpc('admin_delete_attempt', { p_pw: PW, p_id: id }); closeModal(); toast('기록을 지웠어요'); await load(); break;
