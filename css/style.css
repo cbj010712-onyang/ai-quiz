@@ -328,7 +328,7 @@ body.kb .center { margin-block: 0; }
 body.kb .hud { gap: 5px; padding-bottom: 5px; }
 body.kb .hud .dots { display: none; }
 body.kb .card { padding-block: 12px; }
-body.kb .hint-btn { display: none; }
+body.kb .hint-btn { min-height: 36px; font-size: 15px; order: 1; }   /* 키보드가 올라와도 힌트는 볼 수 있게 (작게) */
 body.kb .card > .help, body.kb .card > .ansrow { order: 2; }   /* 힌트를 입력칸 위로 올려서 키보드에 안 가려지게 */
 body.kb .demo-ribbon { display: none; }
 
