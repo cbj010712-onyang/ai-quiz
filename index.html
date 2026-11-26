@@ -7,21 +7,22 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261125a">
+<link rel="stylesheet" href="css/style.css?v=20261126a">
 </head>
 <body>
 <main id="app" aria-live="polite"><p class="loading">불러오는 중…</p></main>
 <div id="dock"></div>
 <div id="layer"></div>
 
-<script src="config.js?v=20261125a"></script>
-<script src="js/common.js?v=20261125a"></script>
-<script src="js/mock.js?v=20261125a"></script>
+<script src="config.js?v=20261126a"></script>
+<script src="js/common.js?v=20261126a"></script>
+<script src="js/mock.js?v=20261126a"></script>
 <script>
 /* =====================================================================
    학생 퀴즈 화면
    - 정답은 서버에만 있어요. 답을 보내면 서버가 채점하고 시간도 서버가 재요.
-   - 새로고침해도 같은 학년·반·번호·이름이면 하던 곳부터 이어서 해요.
+   - 문제는 학생마다 랜덤으로 뽑아요 (스테이지마다 소주제가 겹치지 않게). 보기 순서는 띄울 때마다 섞여요.
+   - 새로고침해도 같은 학년·반·번호·이름이면 하던 곳부터 이어서 해요 (같은 문제). 다시 뽑으려면 관리자 페이지에서 그 기록을 지워요.
    ===================================================================== */
 const DASHBOARD_URL = 'dashboard.html';
 const TURTLE = 'img/mascot.png';   // 학교 거북이 (휴대폰에 홍보 문구)
@@ -39,10 +40,11 @@ function prepare(it) {
   const v = it.view, p = { pos: it.pos, area: it.area, topic: it.topic, level: it.level, type: it.type, view: v, ui: {}, hintText: it.hint || '', result: it.result || null, elapsed: it.elapsed };
   if (p.type === 'mc' || p.type === 'multi') p.opts = shuffle(v.options);
   if (p.type === 'multi') p.ui.multi = [];
-  if (p.type === 'fill') { p.chips = v.chips; p.ui.fill = new Array((v.code.match(/\{\d\}/g) || []).length).fill(null); }
-  if (p.type === 'order') { p.blocks = v.blocks; p.ui.order = []; }
-  if (p.type === 'match') { p.left = v.left; p.right = v.right; p.ui.match = {}; p.ui.active = null; }
-  if (p.type === 'sort') { p.sitems = v.items; p.ui.sort = {}; }
+  // 보기 순서는 화면에 띄울 때마다 새로 섞어요 (채점은 보기 '글자'로 해서 순서와 상관없어요)
+  if (p.type === 'fill') { p.chips = shuffle(v.chips); p.ui.fill = new Array((v.code.match(/\{\d\}/g) || []).length).fill(null); }
+  if (p.type === 'order') { p.blocks = shuffle(v.blocks); p.ui.order = []; }
+  if (p.type === 'match') { p.left = shuffle(v.left); p.right = shuffle(v.right); p.ui.match = {}; p.ui.active = null; }
+  if (p.type === 'sort') { p.sitems = shuffle(v.items); p.ui.sort = {}; }
   if (p.ui.hint === undefined) p.ui.hint = !!it.hint;
   return p;
 }

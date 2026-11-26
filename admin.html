@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261125a">
+<link rel="stylesheet" href="css/style.css?v=20261126a">
 <style>
 main.adm { max-width: 1120px; gap: 14px; }
 .ahead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
@@ -85,16 +85,65 @@ td.nm { white-space: nowrap; }
 .spotwrap .spotbox.b2 { border-color: #F97316; background: rgba(249, 115, 22, .15); }
 .help2 { font-size: 13px; color: var(--sub); font-weight: 700; margin: 0; }
 .login { max-width: 420px; margin: auto; }
+
+/* ---------- 간격 다듬기 (2026-11-26): 묶음 사이는 넓게, 묶음 안은 좁게 ---------- */
+main.adm { max-width: 1160px; gap: 20px; padding-block: 26px 48px; }
+.ahead { align-items: flex-end; gap: 14px 20px; }
+.ahead .ttl { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.ahead h1 { line-height: 1.15; }
+.ahead .acts { gap: 8px; }
+#body { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.sum { gap: 8px; }
+.sum span { padding: 4px 14px; }
+.bar { gap: 10px; }
+.selbar { gap: 10px; padding: 10px 14px; }
+.tblwrap { max-height: calc(100svh - 340px); }
+th, td { padding: 11px 12px; }
+th { padding-block: 12px; }
+td .mini-btn { min-height: 34px; padding: 0 12px; font-size: 14px; border-radius: 10px; }
+.rowacts { display: flex; gap: 6px; }
+.help2 { line-height: 1.65; margin: 0 4px; }
+#body > .help2 { margin-top: -2px; }
+.cover { gap: 12px; }
+.cover div { padding: 10px 14px; line-height: 1.6; }
+.qrow { gap: 12px; padding: 11px 14px; }
+.grid2 { gap: 20px; align-items: start; }
+.grid2 > .stack { gap: 20px; }
+.card.stack { gap: 16px; padding: 22px 22px 24px; }
+.f { gap: 6px; }
+.modegrp { display: grid; gap: 12px; padding-top: 2px; }
+.modegrp .chk input { margin-top: 3px; flex: none; }
+.chk input[type="radio"], .chk input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
+.card.stack > .btn:last-child { margin-top: 4px; }
+.err:empty { display: none; }
+@media (max-width: 640px) {
+  main.adm { gap: 16px; padding-block: 18px 36px; }
+  .ahead { align-items: flex-start; }
+  .ahead h1 { font-size: 28px; }
+  .ahead .acts { gap: 6px; }
+  .ahead .acts .mini-btn { min-height: 38px; padding: 0 12px; font-size: 14px; }
+  .atabs { align-self: stretch; }
+  .atabs button { flex: 1 1 auto; padding: 0 8px; font-size: 15px; white-space: nowrap; }
+  .bar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .bar input[type="search"], .bar .mini-btn { grid-column: 1 / -1; }
+  .bar select { width: 100%; min-width: 0; }
+  .sum { gap: 6px; }
+  .sum span { padding: 3px 11px; font-size: 13px; }
+  .cover { grid-template-columns: 1fr; gap: 8px; }
+  .card.stack { padding: 18px 16px 20px; gap: 14px; }
+  .grid2 { gap: 16px; }
+  .grid2 > .stack { gap: 16px; }
+}
 </style>
 </head>
 <body>
 <main class="adm" id="app"><p class="loading">불러오는 중…</p></main>
 <div id="layer"></div>
 
-<script src="js/qrcode.js?v=20261125a"></script>
-<script src="config.js?v=20261125a"></script>
-<script src="js/common.js?v=20261125a"></script>
-<script src="js/mock.js?v=20261125a"></script>
+<script src="js/qrcode.js?v=20261126a"></script>
+<script src="config.js?v=20261126a"></script>
+<script src="js/common.js?v=20261126a"></script>
+<script src="js/mock.js?v=20261126a"></script>
 <script>
 /* =====================================================================
    관리자 페이지 (비밀번호가 있어야 열려요)
@@ -151,7 +200,7 @@ async function load(keepTab) {
 function render() {
   const st = D.settings;
   $app.innerHTML = `<div class="ahead">
-      <div class="stack" style="gap:2px"><span class="pill">${esc(st.school)} · 관리자</span><h1><span class="blue">AI·코딩</span> 퀴즈 관리</h1></div>
+      <div class="ttl"><span class="pill">${esc(st.school)} · 관리자</span><h1><span class="blue">AI·코딩</span> 퀴즈 관리</h1></div>
       <div class="acts">
         <button class="mini-btn ${st.isOpen ? 'green' : 'red'}" data-act="toggleOpen" title="눌러서 바꾸기">${st.isOpen ? '● 퀴즈 열림' : '● 퀴즈 닫힘'}</button>
         <a class="mini-btn" style="display:inline-flex;align-items:center;text-decoration:none;color:inherit" href="dashboard.html" target="_blank" rel="noopener">대시보드</a>
@@ -209,7 +258,7 @@ function viewPeople() {
         <td class="num">${a.time != null ? fmtTime(a.time) : '-'}</td><td class="num">${a.hints ?? '-'}</td><td class="num">${a.combo ?? '-'}</td>
         <td>${a.flawless ? '<span class="flawmini">무결점</span>' : ''}</td>
         <td><span class="tag2 ${a.status}">${a.finished ? '완료' : '푸는 중'}</span></td><td>${fmtDT(a.started)}</td>
-        <td><button class="mini-btn" data-act="detail" data-id="${a.id}">답 보기</button> <button class="mini-btn red" data-act="delAttempt" data-id="${a.id}">지우기</button></td>
+        <td><div class="rowacts"><button class="mini-btn" data-act="detail" data-id="${a.id}">답 보기</button><button class="mini-btn red" data-act="delAttempt" data-id="${a.id}">지우기</button></div></td>
       </tr>`).join('') || '<tr><td colspan="14" class="note">아직 기록이 없어요.</td></tr>'}</tbody>
     </table></div>
     <p class="help2"><b>간식</b> 칸을 누르면 지급 ↔ 미지급이 바로 바뀌어요. 왼쪽 네모로 여러 학생을 체크해서 한 번에 간식 지급·취소하거나 기록을 지울 수 있어요. '지우기'를 하면 그 학생이 처음부터 다시 도전할 수 있어요. 대시보드에는 이름 가운데가 가려져서 나와요.</p>`;
@@ -440,9 +489,9 @@ function viewSettings() {
         <label class="f"><span>퀴즈 이름</span><input id="sTitle" value="${esc(st.title)}"></label>
         <label class="chk"><input type="checkbox" id="sOpen"${st.isOpen ? ' checked' : ''}> 퀴즈 열기 (끄면 새로 시작할 수 없어요 · 풀던 학생은 마저 풀 수 있어요)</label>
         <label class="f"><span>문제당 제한 시간 (초)</span><input id="sLimit" type="number" min="20" max="180" value="${st.limit}"></label>
-        <div class="f"><span>등급 방식</span>
+        <div class="f"><span>등급 방식</span><div class="modegrp">
           ${Object.entries(MODES).map(([k, m]) => `<label class="chk" style="align-items:flex-start"><input type="radio" name="sMode" value="${k}"${st.tierMode === k ? ' checked' : ''}><span><b>${m.label}</b><br><span class="note">${m.note}</span></span></label>`).join('')}
-        </div>
+        </div></div>
         <label class="f"><span>새 관리자 비밀번호 (바꿀 때만 · 6글자 이상)</span><input id="sPw" type="password" autocomplete="new-password"></label>
         <p class="err" id="sErr" role="alert"></p>
         <button class="btn" data-act="saveSettings">설정 저장</button>
