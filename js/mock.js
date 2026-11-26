@@ -172,11 +172,14 @@
         let pos = 0;
         for (const ar of AREAS) {
           const pool = db.questions.filter(q => q.active && q.area === ar);
-          const chosen = [], need = [0, 3, 1, 1];
+          // supabase.sql 과 같은 규칙: 그림 1개 + ★3 · ★★1 · ★★★1, 아직 안 나온 소주제(topic)를 먼저
+          const chosen = [], need = [0, 3, 1, 1], used = new Set();
+          const take = (list) => { const fresh = list.filter(q => !used.has(q.topic || '')); const q = (fresh.length ? fresh : list)[0]; if (q) { chosen.push(q); used.add(q.topic || ''); } return q; };
           const img = shuffle(pool.filter(q => q.type.startsWith('img')))[0];
-          if (img) { chosen.push(img); need[img.level] = Math.max(need[img.level] - 1, 0); }
-          for (let lv = 1; lv <= 3; lv++) chosen.push(...shuffle(pool.filter(q => q.level === lv && !chosen.includes(q))).slice(0, need[lv]));
-          if (chosen.length < 5) chosen.push(...shuffle(pool.filter(q => !chosen.includes(q))).slice(0, 5 - chosen.length));
+          if (img) { chosen.push(img); used.add(img.topic || ''); need[img.level] = Math.max(need[img.level] - 1, 0); }
+          const plain = pool.filter(q => !q.type.startsWith('img'));
+          for (let lv = 1; lv <= 3; lv++) for (let k = 0; k < need[lv]; k++) if (!take(shuffle(plain.filter(q => q.level === lv && !chosen.includes(q))))) break;
+          while (chosen.length < 5 && take(shuffle(plain.filter(q => !chosen.includes(q))))) {}
           for (const q of shuffle(chosen)) a.items.push({ pos: pos++, qid: q.id, area: q.area, snap: { topic: q.topic, level: q.level, type: q.type, body: clone(q.body) }, view: view(q.type, q.body), opened: null, answered: null, answer: null, correct: null, timeout: null, hint: false, time: null });
         }
         if (!pos) fail('출제할 문제가 없어요. 선생님께 말해 주세요.');
