@@ -7,16 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&family=Noto+Sans+KR:wght@400;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
-<link rel="stylesheet" href="css/style.css?v=20261126a">
+<link rel="stylesheet" href="css/style.css?v=20261126b">
 </head>
 <body>
 <main id="app" aria-live="polite"><p class="loading">불러오는 중…</p></main>
 <div id="dock"></div>
 <div id="layer"></div>
 
-<script src="config.js?v=20261126a"></script>
-<script src="js/common.js?v=20261126a"></script>
-<script src="js/mock.js?v=20261126a"></script>
+<script src="config.js?v=20261126b"></script>
+<script src="js/common.js?v=20261126b"></script>
+<script src="js/mock.js?v=20261126b"></script>
 <script>
 /* =====================================================================
    학생 퀴즈 화면
@@ -111,7 +111,6 @@ function render() {
   if (isNew) window.scrollTo(0, 0);
   if (S.screen === 'quiz' && !S.checked && S.qStart) { startTimer(); const inp = document.getElementById('ans'); if (inp && isNew && !TOUCH) inp.focus({ preventScroll: true }); }
   if (!isTyping()) document.body.classList.remove('kb');
-  else stopTimer();
   if (S.screen === 'result' && isNew) countUp();
   const fx = S.fx; S.fx = '';
   if (fx === 'ok') { confetti(document.querySelector('.score-pill')); buzz(25); }
@@ -490,7 +489,7 @@ function onAct(b, ev) {
     case 'hint':
       if (p.hintText) return;
       b.classList.add('busy');
-      rpc('quiz_hint', { p_token: S.token, p_pos: p.pos }).then(r => { p.hintText = r.hint; u.hint = true; S.fx = 'hint'; const y = scrollY; render(); scrollTo(0, y); }, e => { b.classList.remove('busy'); toast(e.message); });
+      rpc('quiz_hint', { p_token: S.token, p_pos: p.pos }).then(r => { const typing = isTyping(); p.hintText = r.hint; u.hint = true; S.fx = 'hint'; const y = scrollY; render(); scrollTo(0, y); const inp = typing && document.getElementById('ans'); if (inp) { inp.focus({ preventScroll: true }); inp.setSelectionRange(inp.value.length, inp.value.length); } }, e => { b.classList.remove('busy'); toast(e.message); });
       return;
     case 'pick': u.pick = (p.type === 'ox' || p.type === 'imgox') ? v : p.type === 'mc' ? p.opts[Number(b.dataset.k)] : Number(v); break;
     case 'tap': { const img = b.querySelector('img'), r = img.getBoundingClientRect(); u.tap = { x: Math.round((ev.clientX - r.left) / r.width * 1000) / 10, y: Math.round((ev.clientY - r.top) / r.height * 1000) / 10 }; break; }
@@ -537,15 +536,16 @@ function fitKeyboard() {
 }
 let kbTimer = 0;
 $app.addEventListener('focusin', e => {
-  if (!isTyping()) return;
+  if (!TOUCH || !isTyping()) return;   // 키보드 모드는 휴대폰·태블릿에서만 (컴퓨터에서는 화면 그대로)
   clearTimeout(kbTimer); document.body.classList.add('kb');
   [60, 320, 650].forEach(ms => setTimeout(fitKeyboard, ms));   // 키보드가 올라오는 속도가 휴대폰마다 달라요
 });
 $app.addEventListener('focusout', () => { kbTimer = setTimeout(() => { if (!isTyping()) document.body.classList.remove('kb'); }, 200); });
 if (VV) VV.addEventListener('resize', () => { if (document.body.classList.contains('kb')) fitKeyboard(); });
 // 입력칸 옆 확인 버튼을 눌러도 키보드가 먼저 내려가지 않게(눌렀을 때 화면이 흔들리지 않게)
-$app.addEventListener('pointerdown', e => { if (e.target.closest('.kbgo')) e.preventDefault(); });
-$app.addEventListener('mousedown', e => { if (e.target.closest('.kbgo')) e.preventDefault(); });
+// 힌트 버튼도 마찬가지: 키보드가 올라온 채로 눌러도 힌트가 바로 열려요
+$app.addEventListener('pointerdown', e => { if (e.target.closest('.kbgo, .hint-btn')) e.preventDefault(); });
+$app.addEventListener('mousedown', e => { if (e.target.closest('.kbgo, .hint-btn')) e.preventDefault(); });
 $app.addEventListener('keydown', e => { if (e.target.id === 'ans' && e.key === 'Enter') { e.preventDefault(); finish(false); } if (e.target.id === 'fName' && e.key === 'Enter') { e.preventDefault(); submitWho(); } });
 $app.addEventListener('change', e => {
   if (e.target.id !== 'fGrade') return;
